@@ -1,0 +1,29 @@
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" My custom overrides and additions to 
+" https://github.com/johnhamlin/lazy-idea/tree/main?tab=readme-ov-file
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+set ReplaceWithRegister
+set mini-ai
+set dial
+set peekaboo
+
+" let g:WhichKeyDesc_buffer_prev = "<S-h> Prev Buffer"
+nmap <S-h> ^
+" let g:WhichKeyDesc_buffer_next = "<S-l> Next Buffer"
+nmap <S-l> $
+
+let g:WhichKeyDesc_window_down = "<C-j> Call Inline Code Completion"
+imap <C-j> <Action>(CallInlineCompletionAction)
+
+" Code Navigation
+let g:WhichKeyDesc_references = "<leader>r References"
+nmap <leader>r <Action>(FindUsages)
+
+set NERDTree
+let g:WhichKeyDesc_explorer = "<leader>e Explorer NERDTree"
+nmap <leader>e :NERDTree<CR>
+nmap // :NERDTree<CR>
+
+set highlightedyank
+let g:highlightedyank_highlight_duration = "150"

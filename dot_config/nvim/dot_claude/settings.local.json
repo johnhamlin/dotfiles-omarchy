@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(chezmoi add:*)",
+      "WebSearch",
+      "WebFetch(domain:cmp.saghen.dev)",
+      "WebFetch(domain:www.lazyvim.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:vyskocil.me)",
+      "Bash(stylua --check:*)",
+      "Bash(~/.cargo/bin/stylua:*)",
+      "Bash(~/.local/bin/stylua:*)",
+      "Bash(nvim:*)",
+      "Bash(op:*)",
+      "Bash(~/.local/share/nvim/mason/bin/stylua:*)",
+      "Bash(git -C /home/john/Documents/notes log --oneline -10)",
+      "Bash(git -C /home/john/Documents/notes show dc00109 --stat)",
+      "Bash(git -C /home/john/Documents/notes show dc00109 --no-patch)",
+      "Bash(git -C /home/john/Documents/notes diff e7f795a dc00109 -- \"Behavioral.md\")",
+      "Bash(stylua:*)",
+      "Bash(git -C ~/Documents/notes status)",
+      "Bash(cargo install:*)",
+      "Bash(git -C ~/Documents/notes log --oneline -5)",
+      "Bash(/usr/bin/stylua:*)",
+      "Bash(git -C ~/Documents/notes add templates/daily.md templates/note.md)",
+      "Bash(git -C ~/Documents/notes commit -m \"$\\(cat <<''EOF''\nfeat: add obsidian note templates for daily and general notes\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C ~/Documents/notes log --oneline -3)",
+      "Bash(chezmoi managed:*)"
+    ]
+  }
+}

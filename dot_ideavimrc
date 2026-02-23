@@ -1,0 +1,9 @@
+" Required plugins from the JetBrains Marketplace:
+" - IdeaVim
+" - Which-Key
+" - EasyMotion
+" - Vim Dial
+
+source ~/.config/ideavim/lazy-idea/.ideavimrc
+
+source ~/.config/ideavim/johnideavimrc
