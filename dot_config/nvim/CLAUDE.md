@@ -40,7 +40,7 @@ AI: claudecode, copilot | Languages: typescript, angular, ember, go, rust, pytho
 
 **Autopairs**: Uses nvim-autopairs instead of mini.pairs. Special handling in `scheme.lua` disables quote pairing for Lisp filetypes.
 
-**Terminal navigation**: Both `vim-tmux-navigator` and `vim-kitty-navigator` are installed. Kitty navigator copies Python files to `~/.config/kitty/` on build.
+**Terminal navigation**: `smart-splits.nvim` handles navigation for both kitty and tmux. It auto-detects the multiplexer via environment variables (`IS_NVIM` kitty user var, `@pane-is-vim` tmux var). Kitty config uses `--when-focus-on var:IS_NVIM` conditional mappings; tmux config uses `if -F "#{@pane-is-vim}"` bindings.
 
 **LSP restrictions** (`lsp-fixes.lua`): Ember LSP only attaches to projects with `ember-cli-build.js`. Angular LSP only attaches with `angular.json` or `nx.json`. The Angular TS plugin is conditionally injected into vtsls.
 
