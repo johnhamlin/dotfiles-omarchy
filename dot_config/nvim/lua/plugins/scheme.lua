@@ -26,6 +26,17 @@ return {
   {
     "Olical/conjure",
     ft = { "scheme", "racket" },
+    keys = {
+      {
+        "<localleader>d",
+        function()
+          vim.cmd("silent! write")
+          vim.fn.jobstart({ "drracket", vim.api.nvim_buf_get_name(0) }, { detach = true })
+        end,
+        ft = { "scheme", "racket" },
+        desc = "Open in DrRacket",
+      },
+    },
     init = function()
       vim.g["conjure#client#scheme#stdio#command"] = "chez"
       vim.g["conjure#client#scheme#stdio#prompt_pattern"] = "> $?"
