@@ -11,7 +11,7 @@ Installed system-wide by omarchy-fish. These work in both insert and normal mode
 | **Ctrl+Alt+L** | Fuzzy search git log, insert commit hash | **L**og |
 | **Ctrl+Alt+S** | Fuzzy search git status, insert changed file path | **S**tatus |
 | **Ctrl+V** | Fuzzy search shell variables, insert selection | **V**ariable |
-| **Ctrl+Alt+P** | Search processes (DISABLED by omarchy config) | Process |
+| **Ctrl+Alt+K** | Search processes, insert PID (re-bound from Ctrl+Alt+P) | **K**ill |
 
 Tips:
 - **Tab** to multi-select entries in any fzf search
