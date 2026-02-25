@@ -18,14 +18,55 @@ Every `gd`, every search, every Flash jump gets recorded. You can dive 5 levels 
 
 ---
 
-## Level 1: Moving Within a File
+## Level 1: Moving Within a File -- "How Do I Get *There*?"
 
-### Flash (`s`) replaces scrolling
-Stop using `j`/`k` to get around. Press `s`, type 2 characters of where you want to go, press the highlighted label. You're there in 3 keystrokes, anywhere on screen.
+Flash enhances Neovim's built-in motions so they work across the entire visible screen with labeled jumps. Here's a decision tree for getting where you need to go:
 
-- **`s`** -- jump to any visible text (type 2 chars + label)
-- **`S`** -- select a treesitter node (function body, if block, argument)
-- In `/` search, **`Ctrl+s`** adds labels to all matches so you jump directly
+### 1. Jump to a character you can see -- `f`/`t` (Flash-enhanced)
+
+- **`f{char}`** -- jump **onto** the character. `f)` lands your cursor on `)`.
+- **`t{char}`** -- jump **before** the character. `t)` lands your cursor one position before `)`.
+- **`F`/`T`** -- same thing, but search backward.
+- **`;`** repeats the last f/t, **`,`** reverses it.
+
+**Why `t` matters:** `t` is for *operating up to* something. These are bread-and-butter edits:
+- `ct)` -- change everything from cursor to (but not including) `)`. Essential for editing function args.
+- `dt,` -- delete from cursor up to the comma. Clean up a list item.
+- `df,` -- delete from cursor *through* the comma (f lands on it, so it's included).
+- `vf}` -- visually select from cursor to the closing brace.
+
+**Flash enhancement:** When you press `f`, Flash highlights ALL matches on screen. If there's only one, you jump immediately. If there are multiple, each gets a label -- press the label to jump. This means `f` works across the entire screen, not just the current line.
+
+**When to use:** You can see the exact character you want. Single-char target. Fast for short and medium jumps. Great on punctuation (`f.`, `f## `, `f:`) which tends to have fewer matches.
+
+### 2. Jump anywhere on screen -- `s` + 2 chars + label
+
+Press **`s`**, type 2 characters of where you want to go, press the highlighted label. Three keystrokes, anywhere on screen.
+
+**When to use:** Target is far away, or `f` would have too many matches (common chars like `e`, `t`, `a`). Two chars narrows it down fast. Example: jump to the word `return` -- type `sre` and pick the label.
+
+**Pro tip:** `s` works in visual and operator-pending mode too. `ds{2chars}{label}` deletes to that spot. `vs{2chars}{label}` selects to it.
+
+### 3. Select a code structure -- `S` (treesitter) / `Ctrl+Space` (incremental)
+
+- **`S`** -- Flash labels treesitter nodes on screen. Pick one to select the entire node (a function, an argument, an if block).
+- **`Ctrl+Space`** -- start incremental selection at cursor, press again to expand to the next larger node. **`Backspace`** shrinks it.
+
+**When to use:** "Select this function", "select this argument", "select this if block". `S` is faster when you can see the node you want; `Ctrl+Space` is better when you're already inside it and want to grow outward.
+
+### 4. Operate on something far away without moving -- `r` in operator-pending
+
+**`yr{flash to target}{motion}`** -- yank from *there*, cursor stays put.
+
+Example: you see a variable name 20 lines up that you want to copy. Type `yriw`, Flash activates, jump to the word, and it yanks that word -- your cursor never moves. Works with any operator: `dr`, `cr`, etc.
+
+**When to use:** You see a value you want to copy/delete but don't want to lose your place.
+
+### 5. Enhanced `/` search -- `Ctrl+s` in search mode
+
+After typing **`/pattern`**, press **`Ctrl+s`** to add labels to all visible matches. Jump directly instead of pressing `n` repeatedly.
+
+**When to use:** You're searching for something and there are many matches on screen.
 
 ### Symbols, not scrolling
 - **`<leader>ss`** -- fuzzy search symbols in the current file (functions, classes, methods)
