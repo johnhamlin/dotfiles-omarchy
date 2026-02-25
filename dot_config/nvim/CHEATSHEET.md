@@ -71,6 +71,7 @@ After typing **`/pattern`**, press **`Ctrl+s`** to add labels to all visible mat
 ### Symbols, not scrolling
 - **`<leader>ss`** -- fuzzy search symbols in the current file (functions, classes, methods)
 - **`<leader>cs`** -- toggle Aerial sidebar (persistent code outline on the side)
+- **`<leader>ut`** -- toggle treesitter context (pins the parent function/class at the top of the screen)
 - **`{`/`}`** -- jump between paragraphs (works great for jumping between functions)
 
 ### Searching within a file
@@ -93,16 +94,16 @@ You've jumped to the right spot. Now what? These three systems handle the most c
 
 **Scenario:** Yank a variable name, then `griw` on each place you want to paste it -- no need to visually select each target first. Unlike `p` in visual mode, `gr` works with motions so you skip the selection step entirely.
 
-**Surround operator -- `sa`/`sd`/`sr` (mini.surround):**
+**Surround operator -- `gsa`/`gsd`/`gsr` (mini.surround):**
 
 Three operations: **a**dd, **d**elete, **r**eplace surrounding pairs.
 
-- **`sa{textobject}{pair}`** -- add surrounding (e.g., `saiw"` wraps word in quotes, `sa2w(` wraps two words in parens)
-- **`sd{pair}`** -- delete surrounding (e.g., `sd"` removes surrounding quotes, `sd(` removes surrounding parens)
-- **`sr{old}{new}`** -- replace surrounding (e.g., `sr"'` changes double to single quotes, `sr({` changes parens to curlies)
+- **`gsa{textobject}{pair}`** -- add surrounding (e.g., `gsaiw"` wraps word in quotes, `gsa2w(` wraps two words in parens)
+- **`gsd{pair}`** -- delete surrounding (e.g., `gsd"` removes surrounding quotes, `gsd(` removes surrounding parens)
+- **`gsr{old}{new}`** -- replace surrounding (e.g., `gsr"'` changes double to single quotes, `gsr({` changes parens to curlies)
 - Works with `(`, `[`, `{`, `"`, `'`, `` ` ``, and `t` for HTML tags
 
-**Scenario:** Wrapping a variable in a function call → `saiw)` then type the function name. Changing `"string"` to `'string'` → `sr"'`.
+**Scenario:** Wrapping a variable in a function call → `gsaiw)` then type the function name. Changing `"string"` to `'string'` → `gsr"'`.
 
 **Pasting without overwriting your register:**
 
@@ -110,6 +111,43 @@ Three operations: **a**dd, **d**elete, **r**eplace surrounding pairs.
 - **`"0p`** -- always paste from the yank register (ignores anything you deleted/changed). Useful when you `dd` a line then want to paste something you yanked earlier.
 - **`<leader>p`** -- yanky's yank history picker. Browse everything you've copied and pick one.
 - **`[y` / `]y`** -- after pasting, cycle through yank history to swap what you pasted for an older yank.
+- **`]p` / `[p`** -- put indented (linewise). Pastes at the correct indent level for the destination -- no more re-indenting after pasting.
+
+**Comment toggling -- `gcc` / `gc` (mini.comment):**
+
+- **`gcc`** -- toggle comment on current line
+- **`gc{motion}`** -- toggle comment over a motion (`gcip` comments a paragraph, `gc3j` comments 3 lines down)
+- **Visual mode:** select lines, then `gc`
+- Treesitter-aware: uses correct comment syntax in embedded languages (e.g., JS inside HTML)
+
+**Smart increment/decrement -- `<C-a>` / `<C-x>` (dial.nvim):**
+
+Vim's built-in `<C-a>`/`<C-x>` increment/decrement numbers. dial.nvim extends this to:
+- **Booleans:** `true` ↔ `false`
+- **JS/TS:** `let` ↔ `const`
+- **Dates:** `2026/02/25` → `2026/02/26`
+- **Logical operators:** `&&` ↔ `||`
+- **Markdown:** `[ ]` ↔ `[x]` checkboxes, heading level cycling
+- **CSS:** hex colors
+- **JSON:** semver versions
+- `g<C-a>` in visual: sequential increment (turns all selected `0`s into 1, 2, 3, 4...)
+
+**Completion & snippets (blink.cmp):**
+
+- **`<C-space>`** -- open completion menu (LSP completions, paths, buffer words)
+- **`<C-y>`** -- accept the selected completion
+- **Ghost text** shows inline preview automatically -- just keep typing if you don't want it
+- **Snippets:** after expanding a snippet, `<Tab>` / `<S-Tab>` jump between placeholders, `<C-e>` finishes and exits the snippet
+
+**Postfix snippets (JS/TS):**
+
+IntelliJ-style postfix completions. Type an expression, then `.log`, `.const`, etc. and expand:
+- `expr.log` → `console.log(expr)` (also `.warn`, `.error`)
+- `expr.const` → `const name = expr` (also `.let`, `.constd` for destructuring)
+- `expr.return` → `return expr` (also `.await`, `.throw`)
+- `expr.if` → `if (expr) { }` (also `.not` → `!expr`)
+- `expr.for` → `for (const item of expr) { }` (also `.foreach`)
+- `expr.map` → `expr.map((item) => )` (also `.filter`, `.find`)
 
 ---
 
@@ -535,9 +573,14 @@ Editing:
   <leader>cf                      Format
   <leader>sr                      Search & replace across files
   griw                            Replace word with register (paste over it)
-  saiw"                           Wrap word in quotes
-  sd(                             Delete surrounding parens
-  sr"'                            Change double quotes to single
+  gsaiw"                          Wrap word in quotes
+  gsd(                            Delete surrounding parens
+  gsr"'                           Change double quotes to single
+  gcc                             Toggle comment on line
+  gc{motion}                      Comment over a motion (gcip, gc3j)
+  <C-a> / <C-x>                  Smart increment/decrement (bools, dates, etc.)
+  <C-space>                       Open completion menu
+  <C-y>                           Accept completion
   p (visual)                      Paste over selection (register preserved)
   <leader>p                       Browse yank history
 
@@ -554,6 +597,12 @@ PR Review:
   <leader>gC                      PR commit history (all branch commits)
   <leader>gq                      Close diffview
   <leader>gp                      List open PRs (octo)
+
+AI:
+  <leader>ac                      Toggle Claude Code panel
+  <leader>as                      Send selection to Claude (visual)
+  <leader>ab                      Add current buffer to Claude context
+  <leader>aa / <leader>ad         Accept / deny diff
 
 Windows:
   <leader>|                       Split right
@@ -587,9 +636,14 @@ Your config is actually really well set up for navigation. Here's what's already
 11. **Inc-rename** -- live rename preview (`<leader>cr`)
 12. **Yanky** -- yank history and paste-without-overwrite (`<leader>p`, `[y`/`]y`)
 13. **mini.operators** -- replace text with register contents using motions (`griw`, `gr$`)
-14. **mini.surround** -- add/delete/change surrounding pairs (`sa`, `sd`, `sr`)
+14. **mini.surround** -- add/delete/change surrounding pairs (`gsa`, `gsd`, `gsr`)
 15. **Diffview** -- IntelliJ-style file-by-file PR diffs (`<leader>gD`)
 16. **Octo** -- GitHub PR/issue management with LSP in review diffs (`:Octo`)
+17. **mini.comment** -- toggle comments with treesitter awareness (`gcc`, `gc{motion}`)
+18. **dial.nvim** -- smart increment/decrement for booleans, dates, operators (`<C-a>`/`<C-x>`)
+19. **Claude Code** -- AI assistant with diff management (`<leader>ac`, `<leader>as`)
+20. **Postfix snippets** -- IntelliJ-style JS/TS postfix completions (`.log`, `.const`, `.for`)
+21. **Treesitter context** -- sticky function/class header at top of screen (`<leader>ut`)
 
 The tools are all there. The gap is building the muscle memory for the jump-based workflow instead of the arrange-windows workflow.
 
@@ -597,11 +651,11 @@ The tools are all there. The gap is building the muscle memory for the jump-base
 
 ## Practice Progression
 
-**Week 1:** Master `<leader><space>`, `<leader>/`, `gd`, `Ctrl+o`, and `<leader>,`. These five cover 70% of navigation.
+**Week 1:** Master `<leader><space>`, `<leader>/`, `gd`, `Ctrl+o`, `<leader>,`, and `gcc`. These cover 70% of navigation and editing.
 
 **Week 2:** Start using Harpoon. Pin your 3 most-used files each session. Use `<leader>1-3` instead of fuzzy finding.
 
-**Week 3:** Replace scrolling with `s` (Flash). Use `<leader>ss` to jump to functions instead of scrolling to find them. Also start using `griw` to paste over words and `sa`/`sd`/`sr` to manipulate surrounding pairs -- these are the editing companions to Flash navigation.
+**Week 3:** Replace scrolling with `s` (Flash). Use `<leader>ss` to jump to functions instead of scrolling to find them. Also start using `griw` to paste over words, `gsa`/`gsd`/`gsr` to manipulate surrounding pairs, and `<C-a>`/`<C-x>` for smart increment/decrement -- these are the editing companions to Flash navigation.
 
 **Week 4:** Integrate git into your flow. `]h`/`[h` to review changes, `<leader>ghs` to stage hunks, `<leader>gg` for everything else.
 
