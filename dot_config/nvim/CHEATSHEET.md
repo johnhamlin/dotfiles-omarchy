@@ -76,6 +76,7 @@ This is where Neovim matches (and often beats) IntelliJ:
 | Action | Keybinding | Notes |
 |---|---|---|
 | Go to definition | **`gd`** | The big one. Jump into any function/class/variable |
+| Go to file under cursor | **`gf`** | Follow import paths, requires, file references |
 | Go back | **`Ctrl+o`** | Return after any jump |
 | Find references | **`<leader>r`** | Your custom binding (normally `gr`, but mini.operators took it) |
 | Go to implementation | **`gI`** | Jump to impl of an interface/abstract |
