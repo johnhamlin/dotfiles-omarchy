@@ -78,6 +78,39 @@ After typing **`/pattern`**, press **`Ctrl+s`** to add labels to all visible mat
 - **`*`** on a word -- search for all occurrences of word under cursor
 - **`<leader>sb`** -- fuzzy search lines in the current buffer
 
+### Editing what you find
+
+You've jumped to the right spot. Now what? These three systems handle the most common edits without leaving normal mode.
+
+**Replace operator -- `gr` (mini.operators):**
+
+`gr{motion}` replaces the text covered by the motion with whatever you last yanked (or any register contents). Think of it as "paste over" without selecting first.
+
+- **`grw`** -- replace from cursor to end of word with register contents
+- **`griw`** -- replace the entire inner word (more precise, doesn't depend on cursor position within the word)
+- **`gr$`** -- replace from cursor to end of line
+- **In visual mode:** select text, then `gr` to replace the selection
+
+**Scenario:** Yank a variable name, then `griw` on each place you want to paste it -- no need to visually select each target first. Unlike `p` in visual mode, `gr` works with motions so you skip the selection step entirely.
+
+**Surround operator -- `sa`/`sd`/`sr` (mini.surround):**
+
+Three operations: **a**dd, **d**elete, **r**eplace surrounding pairs.
+
+- **`sa{textobject}{pair}`** -- add surrounding (e.g., `saiw"` wraps word in quotes, `sa2w(` wraps two words in parens)
+- **`sd{pair}`** -- delete surrounding (e.g., `sd"` removes surrounding quotes, `sd(` removes surrounding parens)
+- **`sr{old}{new}`** -- replace surrounding (e.g., `sr"'` changes double to single quotes, `sr({` changes parens to curlies)
+- Works with `(`, `[`, `{`, `"`, `'`, `` ` ``, and `t` for HTML tags
+
+**Scenario:** Wrapping a variable in a function call → `saiw)` then type the function name. Changing `"string"` to `'string'` → `sr"'`.
+
+**Pasting without overwriting your register:**
+
+- **`p` in visual mode (yanky.nvim)** -- select text, press `p`, and your register keeps the original yank. Paste the same thing over multiple targets without re-yanking.
+- **`"0p`** -- always paste from the yank register (ignores anything you deleted/changed). Useful when you `dd` a line then want to paste something you yanked earlier.
+- **`<leader>p`** -- yanky's yank history picker. Browse everything you've copied and pick one.
+- **`[y` / `]y`** -- after pasting, cycle through yank history to swap what you pasted for an older yank.
+
 ---
 
 ## Level 2: Jumping Between Files
@@ -501,6 +534,12 @@ Editing:
   <leader>ca                      Code action (quick fixes, imports)
   <leader>cf                      Format
   <leader>sr                      Search & replace across files
+  griw                            Replace word with register (paste over it)
+  saiw"                           Wrap word in quotes
+  sd(                             Delete surrounding parens
+  sr"'                            Change double quotes to single
+  p (visual)                      Paste over selection (register preserved)
+  <leader>p                       Browse yank history
 
 Git:
   <leader>gg                      LazyGit
@@ -546,9 +585,11 @@ Your config is actually really well set up for navigation. Here's what's already
 9. **Session restore** -- pick up where you left off (`<leader>qs`)
 10. **Search & Replace** -- multi-file with preview (`<leader>sr`)
 11. **Inc-rename** -- live rename preview (`<leader>cr`)
-12. **Yanky** -- yank history (`<leader>p`)
-13. **Diffview** -- IntelliJ-style file-by-file PR diffs (`<leader>gD`)
-14. **Octo** -- GitHub PR/issue management with LSP in review diffs (`:Octo`)
+12. **Yanky** -- yank history and paste-without-overwrite (`<leader>p`, `[y`/`]y`)
+13. **mini.operators** -- replace text with register contents using motions (`griw`, `gr$`)
+14. **mini.surround** -- add/delete/change surrounding pairs (`sa`, `sd`, `sr`)
+15. **Diffview** -- IntelliJ-style file-by-file PR diffs (`<leader>gD`)
+16. **Octo** -- GitHub PR/issue management with LSP in review diffs (`:Octo`)
 
 The tools are all there. The gap is building the muscle memory for the jump-based workflow instead of the arrange-windows workflow.
 
@@ -560,7 +601,7 @@ The tools are all there. The gap is building the muscle memory for the jump-base
 
 **Week 2:** Start using Harpoon. Pin your 3 most-used files each session. Use `<leader>1-3` instead of fuzzy finding.
 
-**Week 3:** Replace scrolling with `s` (Flash). Use `<leader>ss` to jump to functions instead of scrolling to find them.
+**Week 3:** Replace scrolling with `s` (Flash). Use `<leader>ss` to jump to functions instead of scrolling to find them. Also start using `griw` to paste over words and `sa`/`sd`/`sr` to manipulate surrounding pairs -- these are the editing companions to Flash navigation.
 
 **Week 4:** Integrate git into your flow. `]h`/`[h` to review changes, `<leader>ghs` to stage hunks, `<leader>gg` for everything else.
 
