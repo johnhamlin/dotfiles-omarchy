@@ -44,3 +44,35 @@ vim.api.nvim_create_autocmd("BufWinEnter", {
     return true -- self-removing
   end,
 })
+
+-- Navigate to symbols from hover/diagnostic floating windows.
+-- When focused in a hover float (K K), gd grabs the word under cursor
+-- and searches workspace symbols for it.
+vim.api.nvim_create_autocmd("WinEnter", {
+  group = vim.api.nvim_create_augroup("float_navigate", { clear = true }),
+  desc = "Add gd to hover/diagnostic floats for type navigation",
+  callback = function()
+    local win = vim.api.nvim_get_current_win()
+    local config = vim.api.nvim_win_get_config(win)
+    if config.relative == "" then
+      return
+    end
+
+    local buf = vim.api.nvim_win_get_buf(win)
+    if vim.b[buf]._float_nav then
+      return
+    end
+    if vim.bo[buf].modifiable then
+      return
+    end
+
+    vim.b[buf]._float_nav = true
+    vim.keymap.set("n", "gd", function()
+      local word = vim.fn.expand("<cword>")
+      pcall(vim.api.nvim_win_close, 0, true)
+      vim.schedule(function()
+        Snacks.picker.lsp_workspace_symbols({ query = word })
+      end)
+    end, { buffer = buf, desc = "Jump to symbol from hover" })
+  end,
+})

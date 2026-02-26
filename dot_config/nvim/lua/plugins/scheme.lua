@@ -36,6 +36,17 @@ return {
         ft = { "scheme", "racket" },
         desc = "Open in DrRacket",
       },
+      {
+        "<localleader>t",
+        function()
+          vim.cmd("silent! write")
+          vim.cmd("split | terminal raco test " .. vim.fn.shellescape(vim.api.nvim_buf_get_name(0)))
+          vim.bo.buflisted = false
+          vim.bo.bufhidden = "wipe"
+        end,
+        ft = { "scheme", "racket" },
+        desc = "Run tests (raco test)",
+      },
     },
     init = function()
       vim.g["conjure#client#scheme#stdio#command"] = "chez"

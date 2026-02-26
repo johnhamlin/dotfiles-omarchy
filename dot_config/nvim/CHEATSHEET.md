@@ -559,6 +559,7 @@ Reading code:
   Ctrl+o                          Come back
   <leader>r                       Find all references
   K                               Hover docs
+  gy                              Go to type definition
   <leader>cs                      Toggle code outline sidebar
 
 Quick switching:

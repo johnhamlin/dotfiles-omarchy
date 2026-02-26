@@ -8,6 +8,13 @@ return {
       delete_check_events = "TextChanged,InsertLeave",
     })
 
+    local s = ls.snippet
+    local t = ls.text_node
+
+    ls.add_snippets(“racket”, {
+      s(“bsl”, { t(“#lang htdp/bsl”) }),
+    })
+
     -- Optional: a key to “finish” a snippet and remove markers immediately
     vim.keymap.set({ "i", "s" }, "<C-e>", function()
       if ls.in_snippet() then
