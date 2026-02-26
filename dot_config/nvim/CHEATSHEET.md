@@ -119,6 +119,7 @@ Three operations: **a**dd, **d**elete, **r**eplace surrounding pairs.
 - **`gc{motion}`** -- toggle comment over a motion (`gcip` comments a paragraph, `gc3j` comments 3 lines down)
 - **Visual mode:** select lines, then `gc`
 - Treesitter-aware: uses correct comment syntax in embedded languages (e.g., JS inside HTML)
+- **`<C-u>` in insert mode** -- clears the auto-inserted comment leader when Enter continues a comment and you want to break out
 
 **Smart increment/decrement -- `<C-a>` / `<C-x>` (dial.nvim):**
 

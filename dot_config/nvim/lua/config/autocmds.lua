@@ -45,6 +45,17 @@ vim.api.nvim_create_autocmd("BufWinEnter", {
   end,
 })
 
+-- Map q to close finished terminal buffers
+vim.api.nvim_create_autocmd("TermClose", {
+  group = vim.api.nvim_create_augroup("close_finished_term", { clear = true }),
+  desc = "Press q to close finished terminal buffers",
+  callback = function(event)
+    if vim.api.nvim_buf_is_valid(event.buf) then
+      vim.keymap.set("n", "q", "<cmd>bd!<cr>", { buffer = event.buf, silent = true })
+    end
+  end,
+})
+
 -- Navigate to symbols from hover/diagnostic floating windows.
 -- When focused in a hover float (K K), gd grabs the word under cursor
 -- and searches workspace symbols for it.

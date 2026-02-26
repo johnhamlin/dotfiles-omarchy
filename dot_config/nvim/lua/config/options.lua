@@ -5,3 +5,10 @@
 -- Note: Plugin specs belong in lua/plugins/*.lua, not here
 -- This file is for vim.opt.* settings only
 
+vim.api.nvim_create_autocmd("FileType", {
+  desc = "Don't continue comments with o/O",
+  callback = function()
+    vim.opt_local.formatoptions:remove("o")
+  end,
+})
+
