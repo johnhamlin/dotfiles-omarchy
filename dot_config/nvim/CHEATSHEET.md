@@ -413,6 +413,11 @@ When you search references (`<leader>r`) or grep (`<leader>/`), you can send res
 - **`]q`/`[q`** -- jump through quickfix items one by one
 - **`<leader>xq`** -- view quickfix list in Trouble (filterable, persistent)
 
+### Command-Line Window
+- **`q:`** -- open command history in a full Vim buffer. Edit with motions, `<CR>` to execute.
+- **`q/`** -- same thing for search history.
+- **`Ctrl-f`** while on the `:` or `/` command line -- pop into the command-line window mid-command to edit with full Vim motions.
+
 ### Treesitter Selection
 - **`Ctrl+Space`** -- start incremental selection (selects the smallest node)
 - **`Ctrl+Space`** again -- expand to the next larger node
