@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Vivaldi (Intel)
+Comment=Vivaldi with Intel iGPU (battery-friendly)
+Exec=vivaldi-intel %U
+Icon=vivaldi
+Type=Application
+Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/unknown;x-scheme-handler/about;x-scheme-handler/https;x-scheme-handler/http;text/html;text/xml;application/xhtml+xml;

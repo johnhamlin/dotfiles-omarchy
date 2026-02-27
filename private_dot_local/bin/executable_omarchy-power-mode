@@ -1,0 +1,498 @@
+#!/bin/bash
+
+# omarchy-power-mode - Switch between performance, balanced, and battery power profiles
+# Requires reboot to fully apply changes
+#
+# Modes:
+#   performance - Maximum dGPU performance, RTD3 disabled, for docked power-user sessions
+#   balanced    - RTD3 enabled, auto-switches based on dock status
+#   battery     - Full battery optimization, iGPU primary rendering
+
+set -euo pipefail
+
+# Paths
+PROFILES_DIR="$HOME/.config/omarchy/power-profiles"
+STATE_FILE="$HOME/.local/state/omarchy/power-mode"
+ENVS_CONF="$HOME/.config/hypr/envs.conf"
+MODPROBE_DEST="/etc/modprobe.d/nvidia-power.conf"
+UDEV_DEST="/etc/udev/rules.d/80-nvidia-pm.rules"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_status() {
+    echo -e "${BLUE}==>${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}==>${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}==>${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}==>${NC} $1"
+}
+
+# Validate BIOS GPU mode matches requested power mode
+validate_bios_mode() {
+    local mode="$1"
+    local has_intel=$(lspci -d ::03xx 2>/dev/null | grep -c "Intel" || true)
+
+    if [[ "$mode" == "balanced" || "$mode" == "battery" ]]; then
+        if [[ "$has_intel" -eq 0 ]]; then
+            print_error "Cannot set $mode: Intel GPU not detected (BIOS in Discrete mode?)"
+            print_error "Use 'performance' mode, or change BIOS to Hybrid Graphics first"
+            exit 1
+        fi
+    fi
+
+    if [[ "$mode" == "performance" && "$has_intel" -gt 0 ]]; then
+        print_warning "Note: performance mode is designed for BIOS Discrete Graphics"
+        print_warning "Current: Hybrid mode. Consider 'balanced' mode, or change BIOS to Discrete."
+    fi
+}
+
+# Ensure template files exist
+ensure_templates() {
+    mkdir -p "$PROFILES_DIR"
+
+    # nvidia-power.conf templates
+    if [[ ! -f "$PROFILES_DIR/nvidia-power.conf.performance" ]]; then
+        echo "options nvidia NVreg_DynamicPowerManagement=0x00" > "$PROFILES_DIR/nvidia-power.conf.performance"
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/nvidia-power.conf.balanced" ]]; then
+        echo "options nvidia NVreg_DynamicPowerManagement=0x02" > "$PROFILES_DIR/nvidia-power.conf.balanced"
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/nvidia-power.conf.battery" ]]; then
+        echo "options nvidia NVreg_DynamicPowerManagement=0x02" > "$PROFILES_DIR/nvidia-power.conf.battery"
+    fi
+
+    # udev rules templates
+    if [[ ! -f "$PROFILES_DIR/80-nvidia-pm.rules.performance" ]]; then
+        echo "# No runtime PM - GPU stays active" > "$PROFILES_DIR/80-nvidia-pm.rules.performance"
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/80-nvidia-pm.rules.balanced" ]]; then
+        cat > "$PROFILES_DIR/80-nvidia-pm.rules.balanced" << 'EOF'
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", ATTR{power/control}="auto"
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", ATTR{power/control}="auto"
+EOF
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/80-nvidia-pm.rules.battery" ]]; then
+        cat > "$PROFILES_DIR/80-nvidia-pm.rules.battery" << 'EOF'
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030000", ATTR{power/control}="auto"
+ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x030200", ATTR{power/control}="auto"
+EOF
+    fi
+
+    # envs.conf templates
+    if [[ ! -f "$PROFILES_DIR/envs.conf.performance" ]]; then
+        cat > "$PROFILES_DIR/envs.conf.performance" << 'EOF'
+# Performance Mode (BIOS Discrete Graphics)
+#
+# Requires: BIOS → Config → Display → Graphics Device → "Discrete Graphics"
+# Only NVIDIA exists - no AQ_DRM_DEVICES needed.
+
+env = NVD_BACKEND,direct
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = VDPAU_DRIVER,nvidia
+env = __GL_MaxFramesAllowed,1
+env = __GL_GSYNC_ALLOWED,1
+env = MOZ_DISABLE_RDD_SANDBOX,1
+EOF
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/envs.conf.balanced" ]]; then
+        cat > "$PROFILES_DIR/envs.conf.balanced" << 'EOF'
+# Balanced Mode (BIOS Hybrid Graphics)
+#
+# Intel iGPU primary, NVIDIA available for offload.
+# RTD3 enabled - dGPU auto-suspends when idle.
+
+env = AQ_DRM_DEVICES,/dev/dri/intel-igpu:/dev/dri/nvidia-dgpu
+env = NVD_BACKEND,direct
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = MOZ_DISABLE_RDD_SANDBOX,1
+EOF
+    fi
+
+    if [[ ! -f "$PROFILES_DIR/envs.conf.battery" ]]; then
+        cat > "$PROFILES_DIR/envs.conf.battery" << 'EOF'
+# Battery Mode (BIOS Hybrid Graphics)
+#
+# Intel iGPU only - NVIDIA disabled to keep dGPU suspended.
+
+env = AQ_DRM_DEVICES,/dev/dri/intel-igpu:/dev/dri/nvidia-dgpu
+# env = NVD_BACKEND,direct
+# env = LIBVA_DRIVER_NAME,nvidia
+# env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+EOF
+    fi
+}
+
+# Get current mode from state file
+get_current_mode() {
+    if [[ -f "$STATE_FILE" ]]; then
+        cat "$STATE_FILE"
+    else
+        echo "unknown"
+    fi
+}
+
+# Copy envs.conf template for the mode
+copy_envs_template() {
+    local mode="$1"
+    local src="$PROFILES_DIR/envs.conf.$mode"
+
+    if [[ ! -f "$src" ]]; then
+        print_warning "envs.conf template not found: $src, skipping"
+        return
+    fi
+
+    cp "$src" "$ENVS_CONF"
+    print_success "Copied envs.conf template for $mode mode"
+}
+
+# Copy modprobe config
+copy_modprobe_config() {
+    local mode="$1"
+    local src="$PROFILES_DIR/nvidia-power.conf.$mode"
+
+    if [[ ! -f "$src" ]]; then
+        print_error "Template not found: $src"
+        return 1
+    fi
+
+    print_status "Copying modprobe config (requires sudo)..."
+    sudo cp "$src" "$MODPROBE_DEST"
+    print_success "Installed $MODPROBE_DEST"
+}
+
+# Copy udev rules
+copy_udev_rules() {
+    local mode="$1"
+    local src="$PROFILES_DIR/80-nvidia-pm.rules.$mode"
+
+    if [[ ! -f "$src" ]]; then
+        print_error "Template not found: $src"
+        return 1
+    fi
+
+    print_status "Copying udev rules (requires sudo)..."
+    sudo cp "$src" "$UDEV_DEST"
+    print_success "Installed $UDEV_DEST"
+}
+
+# Enable/disable nvidia-persistenced
+configure_persistenced() {
+    local mode="$1"
+
+    if [[ "$mode" == "performance" ]]; then
+        print_status "Enabling nvidia-persistenced..."
+        sudo systemctl enable nvidia-persistenced
+        print_success "nvidia-persistenced enabled"
+    else
+        print_status "Disabling nvidia-persistenced..."
+        sudo systemctl disable nvidia-persistenced
+        print_success "nvidia-persistenced disabled"
+    fi
+}
+
+# Set power profile
+set_power_profile() {
+    local mode="$1"
+    local profile
+
+    case "$mode" in
+        performance)
+            profile="performance"
+            ;;
+        balanced)
+            profile="balanced"
+            ;;
+        battery)
+            profile="power-saver"
+            ;;
+    esac
+
+    if command -v powerprofilesctl &> /dev/null; then
+        print_status "Setting power profile to $profile..."
+        powerprofilesctl set "$profile"
+        print_success "Power profile set to $profile"
+    else
+        print_warning "powerprofilesctl not found, skipping power profile"
+    fi
+}
+
+# Set default browser based on mode
+# Performance: vivaldi-nvidia wrapper for VA-API hardware video decode on dGPU
+# Balanced: vivaldi-intel wrapper to keep dGPU asleep (iGPU VA-API)
+# Battery: stock vivaldi (no special flags needed)
+set_default_browser() {
+    local mode="$1"
+    local browser
+
+    case "$mode" in
+        performance) browser="vivaldi-nvidia.desktop" ;;
+        balanced)    browser="vivaldi-intel.desktop" ;;
+        *)           browser="vivaldi-stable.desktop" ;;
+    esac
+
+    # Check if the desktop file exists (local wrappers first, then system)
+    local desktop_file
+    if [[ -f "$HOME/.local/share/applications/$browser" ]]; then
+        desktop_file="$HOME/.local/share/applications/$browser"
+    elif [[ -f "/usr/share/applications/$browser" ]]; then
+        desktop_file="/usr/share/applications/$browser"
+    fi
+
+    if [[ ! -f "$desktop_file" ]]; then
+        print_warning "Browser desktop file not found: $browser, skipping"
+        return
+    fi
+
+    print_status "Setting default browser to $browser..."
+    xdg-settings set default-web-browser "$browser"
+    print_success "Default browser set to $browser"
+}
+
+# Save current mode to state file
+save_state() {
+    local mode="$1"
+    mkdir -p "$(dirname "$STATE_FILE")"
+    echo "$mode" > "$STATE_FILE"
+    print_success "Saved state: $mode"
+}
+
+# Apply all changes for a mode
+apply_mode() {
+    local mode="$1"
+
+    echo ""
+    print_status "Switching to ${mode^^} mode..."
+    echo ""
+
+    validate_bios_mode "$mode"
+    ensure_templates
+    copy_envs_template "$mode"
+    copy_modprobe_config "$mode"
+    copy_udev_rules "$mode"
+    configure_persistenced "$mode"
+    set_power_profile "$mode"
+    set_default_browser "$mode"
+    save_state "$mode"
+
+    echo ""
+    print_success "Power mode set to: $mode"
+    print_warning "A reboot is required to fully apply changes."
+    echo ""
+}
+
+# Show current status
+show_status() {
+    local current_mode
+    current_mode=$(get_current_mode)
+
+    # Detect BIOS GPU mode from hardware
+    local gpu_mode="unknown"
+    local has_intel=$(lspci -d ::03xx 2>/dev/null | grep -c "Intel" || true)
+    local has_nvidia=$(lspci -d ::03xx 2>/dev/null | grep -c "NVIDIA" || true)
+    if [[ "$has_nvidia" -gt 0 && "$has_intel" -eq 0 ]]; then
+        gpu_mode="discrete"
+    elif [[ "$has_nvidia" -gt 0 && "$has_intel" -gt 0 ]]; then
+        gpu_mode="hybrid"
+    elif [[ "$has_intel" -gt 0 ]]; then
+        gpu_mode="integrated"
+    fi
+
+    echo ""
+    echo -e "${BLUE}Power Mode Status${NC}"
+    echo "---------------------------------------------"
+    echo -e "Configured mode:  ${GREEN}$current_mode${NC}"
+    echo -e "BIOS GPU mode:    ${GREEN}$gpu_mode${NC}"
+    echo ""
+
+    # Mode descriptions
+    echo "Available modes:"
+    echo "  performance - BIOS Discrete, dGPU only, docked workstation"
+    echo "  balanced    - BIOS Hybrid, iGPU primary, dGPU for offload"
+    echo "  battery     - BIOS Hybrid, iGPU only, max battery life"
+    echo ""
+
+    # Check actual system state
+    echo "Current system state:"
+
+    # NVIDIA module loaded?
+    if [[ -d /sys/module/nvidia ]]; then
+        echo "  NVIDIA module:          loaded"
+    else
+        echo "  NVIDIA module:          not loaded"
+    fi
+
+    # DynamicPowerManagement - check modprobe config since sysfs path may not exist
+    if [[ -f "$MODPROBE_DEST" ]]; then
+        local dpm_config
+        dpm_config=$(grep -oP 'NVreg_DynamicPowerManagement=\K[^ ]+' "$MODPROBE_DEST" 2>/dev/null || echo "not set")
+        local dpm_desc
+        case "$dpm_config" in
+            0x00) dpm_desc="0x00 (disabled - performance)" ;;
+            0x02) dpm_desc="0x02 (RTD3 enabled - balanced/battery)" ;;
+            *) dpm_desc="$dpm_config" ;;
+        esac
+        echo "  DynamicPowerManagement: $dpm_desc"
+    else
+        echo "  DynamicPowerManagement: (no config installed)"
+    fi
+
+    # nvidia-persistenced
+    if systemctl is-active --quiet nvidia-persistenced; then
+        echo "  nvidia-persistenced:    active"
+    else
+        echo "  nvidia-persistenced:    inactive"
+    fi
+
+    # Power profile
+    if command -v powerprofilesctl &> /dev/null; then
+        local profile
+        profile=$(powerprofilesctl get)
+        echo "  Power profile:          $profile"
+    fi
+
+    # Default browser
+    local default_browser
+    default_browser=$(xdg-settings get default-web-browser 2>/dev/null || echo "unknown")
+    echo "  Default browser:        $default_browser"
+
+    # GPU runtime status
+    if [[ -f /sys/bus/pci/devices/0000:01:00.0/power/runtime_status ]]; then
+        local gpu_status
+        gpu_status=$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status)
+        echo "  GPU runtime status:     $gpu_status"
+    fi
+
+    # Key environment variables
+    echo ""
+    echo "Key environment variables:"
+    local vars=("AQ_DRM_DEVICES" "NVD_BACKEND" "LIBVA_DRIVER_NAME" "__GLX_VENDOR_LIBRARY_NAME" "VDPAU_DRIVER")
+    for var in "${vars[@]}"; do
+        local var_value="${!var:-not set}"
+        echo "  $var: $var_value"
+    done
+
+    echo ""
+}
+
+# Interactive mode with gum
+interactive_mode() {
+    local current_mode
+    current_mode=$(get_current_mode)
+
+    if ! command -v gum &> /dev/null; then
+        print_error "gum is not installed. Use: omarchy-power-mode performance|balanced|battery"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${BLUE}Power Mode Selection${NC}"
+    echo -e "Current mode: ${GREEN}$current_mode${NC}"
+    echo ""
+
+    local choice
+    choice=$(gum choose --header "Select power mode:" \
+        "performance  (BIOS Discrete, dGPU only)" \
+        "balanced     (BIOS Hybrid, iGPU primary, RTD3)" \
+        "battery      (BIOS Hybrid, iGPU only)" \
+        "status" \
+        "cancel")
+
+    # Extract mode name from choice
+    local mode
+    mode=$(echo "$choice" | awk '{print $1}')
+
+    case "$mode" in
+        performance|balanced|battery)
+            apply_mode "$mode"
+
+            if gum confirm "Reboot now to apply changes?"; then
+                print_status "Rebooting..."
+                systemctl reboot
+            else
+                print_warning "Remember to reboot to fully apply changes."
+            fi
+            ;;
+        status)
+            show_status
+            ;;
+        cancel|"")
+            echo "Cancelled."
+            exit 0
+            ;;
+    esac
+}
+
+# Prompt for reboot
+prompt_reboot() {
+    echo ""
+    read -p "Reboot now to apply changes? [y/N] " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_status "Rebooting..."
+        systemctl reboot
+    else
+        print_warning "Remember to reboot to fully apply changes."
+    fi
+}
+
+# Main
+main() {
+    case "${1:-}" in
+        performance|balanced|battery)
+            apply_mode "$1"
+            prompt_reboot
+            ;;
+        status)
+            show_status
+            ;;
+        get)
+            get_current_mode
+            ;;
+        "")
+            interactive_mode
+            ;;
+        -h|--help)
+            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            echo ""
+            echo "Commands:"
+            echo "  performance  BIOS Discrete mode, dGPU only, for docked workstation use"
+            echo "  balanced     BIOS Hybrid mode, iGPU primary, dGPU available for offload"
+            echo "  battery      BIOS Hybrid mode, iGPU only, maximize battery life"
+            echo "  status       Show current power mode status"
+            echo "  get          Print current mode (for scripts)"
+            echo ""
+            echo "Without arguments, launches interactive mode with gum."
+            echo ""
+            echo "BIOS Graphics Modes:"
+            echo "  performance requires: BIOS → Config → Display → 'Discrete Graphics'"
+            echo "  balanced/battery use: BIOS → Config → Display → 'Hybrid Graphics'"
+            ;;
+        *)
+            print_error "Unknown command: $1"
+            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
