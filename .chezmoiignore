@@ -1,1 +1,3 @@
 .config/nvim/lazy-lock.json
+packages-explicit.txt
+packages-aur.txt

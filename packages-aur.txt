@@ -1,0 +1,11 @@
+android-studio
+bluebubbles-bin
+espanso-wayland
+figma-linux
+google-chrome
+hyprsession
+jetbrains-toolbox
+postman-bin
+raindrop
+woeusb-ng
+xdg-ninja
