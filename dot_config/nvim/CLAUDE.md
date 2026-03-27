@@ -38,7 +38,7 @@ AI: claudecode, copilot | Languages: typescript, angular, ember, go, rust, pytho
 
 **mini.operators conflict**: `gr` is remapped to `<leader>r` for LSP references because mini.operators uses `gr` for replace operator. See `nvim-lspconfig.lua` for the remapping.
 
-**Autopairs**: Uses nvim-autopairs instead of mini.pairs. Special handling in `scheme.lua` disables quote pairing for Lisp filetypes.
+**Autopairs**: Uses nvim-autopairs instead of mini.pairs. Special handling in `lisp.lua` disables quote pairing for Lisp filetypes.
 
 **Terminal navigation**: `smart-splits.nvim` handles navigation for both kitty and tmux. It auto-detects the multiplexer via environment variables (`IS_NVIM` kitty user var, `@pane-is-vim` tmux var). Kitty config uses `--when-focus-on var:IS_NVIM` conditional mappings; tmux config uses `if -F "#{@pane-is-vim}"` bindings.
 

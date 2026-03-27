@@ -75,7 +75,13 @@ abbr -a -- cm chezmoi
 abbr -a -- se sudoedit
 abbr -a -- nr 'npm run'
 abbr -a -- nrd 'npm run dev'
+abbr -a -- nrs 'npm run start'
 abbr -a -- ni 'npm i'
+abbr -a -- p pnpm
+abbr -a -- pi 'pnpm install'
+abbr -a -- pr 'pnpm run'
+abbr -a -- prd 'pnpm run dev'
+abbr -a -- prs 'pnpm run start'
 abbr -a -- kssh 'kitty +kitten ssh'
 abbr -a -- ksshg 'kitty +kitten ssh gram'
 abbr -a -- kicat 'kitty +kitten icat'

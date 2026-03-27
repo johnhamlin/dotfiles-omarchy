@@ -7,21 +7,6 @@ return {
     end,
   },
 
-  -- Rainbow parens for lisps
-  {
-    "HiPhish/rainbow-delimiters.nvim",
-    ft = { "scheme", "racket", "lisp", "clojure" },
-    config = function()
-      local rainbow = require("rainbow-delimiters")
-      require("rainbow-delimiters.setup").setup({
-        query = {
-          ["scheme"] = "rainbow-delimiters",
-          ["racket"] = "rainbow-delimiters",
-        },
-      })
-    end,
-  },
-
   -- Conjure + Chez
   {
     "Olical/conjure",
@@ -85,6 +70,9 @@ return {
   {
     "gpanders/nvim-parinfer",
     ft = { "scheme", "racket", "lisp", "clojure" },
+    keys = {
+      { "<localleader>p", "<cmd>ParinferToggle<cr>", desc = "Toggle parinfer" },
+    },
   },
 
   -- S-expression editing
@@ -95,6 +83,9 @@ return {
       "tpope/vim-surround",
     },
     ft = { "scheme", "racket", "lisp", "clojure" },
+    init = function()
+      vim.g.sexp_filetypes = "clojure,scheme,racket,lisp,timl,fennel"
+    end,
   },
   {
     "tpope/vim-sexp-mappings-for-regular-people",
