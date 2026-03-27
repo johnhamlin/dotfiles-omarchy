@@ -9,7 +9,7 @@ source ~/.config/uwsm/default
 
 # Activate mise if present on the system
 # if [ "$SHELL" = "/bin/bash" ] && command -v mise &> /dev/null; then
-#   eval "$(mise activate bash)"
+#   eval "$(mise activate bash --shims)"
 # elif [ "$SHELL" = "/bin/fish" ] && command -v mise &> /dev/null; then
 #   mise activate fish | source
 # fi

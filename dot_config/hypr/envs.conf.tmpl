@@ -1,0 +1,22 @@
+{{ if eq .machine "thinkpad-p1-gen4" -}}
+# Performance Mode (BIOS Discrete Graphics)
+#
+# Requires: BIOS → Config → Display → Graphics Device → "Discrete Graphics"
+# This disables Intel iGPU at hardware level - only NVIDIA exists.
+#
+# For flexible use (docked + undocked), use "balanced" mode with Hybrid BIOS instead.
+#
+# Trade-offs:
+#   - Internal display won't work (fine for docked use)
+#   - Must enter BIOS to switch back for mobile use
+#   - Higher idle power (~11W vs ~5W)
+
+# No AQ_DRM_DEVICES needed - only one GPU exists in discrete mode
+{{ end -}}
+env = NVD_BACKEND,direct
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = VDPAU_DRIVER,nvidia
+env = __GL_MaxFramesAllowed,1
+env = __GL_GSYNC_ALLOWED,1
+env = MOZ_DISABLE_RDD_SANDBOX,1

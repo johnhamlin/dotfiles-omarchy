@@ -43,19 +43,37 @@ print_error() {
 # Validate BIOS GPU mode matches requested power mode
 validate_bios_mode() {
     local mode="$1"
+    local attr="/sys/class/firmware-attributes/thinklmi/attributes/GraphicsDevice"
     local has_intel=$(lspci -d ::03xx 2>/dev/null | grep -c "Intel" || true)
+    local has_thinklmi=false
+    local bios_gpu=""
+
+    if [[ -d "$attr" ]]; then
+        has_thinklmi=true
+        bios_gpu=$(sudo cat "$attr/current_value")
+    fi
 
     if [[ "$mode" == "balanced" || "$mode" == "battery" ]]; then
         if [[ "$has_intel" -eq 0 ]]; then
-            print_error "Cannot set $mode: Intel GPU not detected (BIOS in Discrete mode?)"
-            print_error "Use 'performance' mode, or change BIOS to Hybrid Graphics first"
-            exit 1
+            if [[ "$has_thinklmi" == true ]]; then
+                print_warning "Intel GPU not detected (BIOS currently: $bios_gpu)"
+                print_warning "BIOS GPU mode will be staged to SwitchableGfx — reboot required"
+            else
+                print_error "Cannot set $mode: Intel GPU not detected (BIOS in Discrete mode?)"
+                print_error "Use 'performance' mode, or change BIOS to Hybrid Graphics first"
+                exit 1
+            fi
         fi
     fi
 
     if [[ "$mode" == "performance" && "$has_intel" -gt 0 ]]; then
-        print_warning "Note: performance mode is designed for BIOS Discrete Graphics"
-        print_warning "Current: Hybrid mode. Consider 'balanced' mode, or change BIOS to Discrete."
+        if [[ "$has_thinklmi" == true ]]; then
+            print_warning "Note: performance mode is designed for BIOS Discrete Graphics"
+            print_warning "BIOS GPU mode will be staged to DiscreteGfx — reboot required"
+        else
+            print_warning "Note: performance mode is designed for BIOS Discrete Graphics"
+            print_warning "Current: Hybrid mode. Consider 'balanced' mode, or change BIOS to Discrete."
+        fi
     fi
 }
 
@@ -210,6 +228,57 @@ configure_persistenced() {
     fi
 }
 
+# Stage BIOS GPU mode change via ThinkLMI sysfs
+set_bios_gpu_mode() {
+    local mode="$1"
+    local attr="/sys/class/firmware-attributes/thinklmi/attributes/GraphicsDevice"
+    local save="/sys/class/firmware-attributes/thinklmi/attributes/save_settings"
+
+    if [[ ! -d "$attr" ]]; then
+        print_warning "ThinkLMI GraphicsDevice not available, skipping BIOS GPU mode"
+        return
+    fi
+
+    local current desired
+    current=$(sudo cat "$attr/current_value")
+
+    case "$mode" in
+        performance) desired="DiscreteGfx" ;;
+        *)           desired="SwitchableGfx" ;;
+    esac
+
+    if [[ "$current" == "$desired" ]]; then
+        print_success "BIOS GPU mode already set to $desired"
+        return
+    fi
+
+    print_status "Staging BIOS GPU mode change: $current → $desired..."
+    echo "$desired" | sudo tee "$attr/current_value" > /dev/null
+    local save_mode
+    save_mode=$(sudo cat "$save")
+    if [[ "$save_mode" == "bulk" ]]; then
+        echo "save" | sudo tee "$save" > /dev/null
+    fi
+    print_success "BIOS GPU mode staged: $desired (will apply on reboot)"
+}
+
+# Enable/disable nvidia-powerd (Dynamic Boost)
+# Dynamic Boost requires iGPU+dGPU cooperation, so it only works in hybrid mode.
+# In discrete mode it can't communicate with SBIOS, causing GPU to stay at P0 and fans to run full blast.
+configure_nvidia_powerd() {
+    local mode="$1"
+
+    if [[ "$mode" == "performance" ]]; then
+        print_status "Disabling nvidia-powerd (no Dynamic Boost in discrete mode)..."
+        sudo systemctl disable --now nvidia-powerd 2>/dev/null || true
+        print_success "nvidia-powerd disabled"
+    else
+        print_status "Enabling nvidia-powerd..."
+        sudo systemctl enable nvidia-powerd 2>/dev/null || true
+        print_success "nvidia-powerd enabled"
+    fi
+}
+
 # Set power profile
 set_power_profile() {
     local mode="$1"
@@ -239,7 +308,7 @@ set_power_profile() {
 # Set default browser based on mode
 # Performance: vivaldi-nvidia wrapper for VA-API hardware video decode on dGPU
 # Balanced: vivaldi-intel wrapper to keep dGPU asleep (iGPU VA-API)
-# Battery: stock vivaldi (no special flags needed)
+# Battery: vivaldi-intel wrapper (iGPU hw decode uses less power than CPU decode)
 set_default_browser() {
     local mode="$1"
     local browser
@@ -247,7 +316,7 @@ set_default_browser() {
     case "$mode" in
         performance) browser="vivaldi-nvidia.desktop" ;;
         balanced)    browser="vivaldi-intel.desktop" ;;
-        *)           browser="vivaldi-stable.desktop" ;;
+        *)           browser="vivaldi-intel.desktop" ;;
     esac
 
     # Check if the desktop file exists (local wrappers first, then system)
@@ -285,18 +354,20 @@ apply_mode() {
     echo ""
 
     validate_bios_mode "$mode"
+    set_bios_gpu_mode "$mode"
     ensure_templates
     copy_envs_template "$mode"
     copy_modprobe_config "$mode"
     copy_udev_rules "$mode"
     configure_persistenced "$mode"
+    configure_nvidia_powerd "$mode"
     set_power_profile "$mode"
     set_default_browser "$mode"
     save_state "$mode"
 
     echo ""
     print_success "Power mode set to: $mode"
-    print_warning "A reboot is required to fully apply changes."
+    print_warning "Reboot to fully apply changes (including BIOS GPU mode if changed)."
     echo ""
 }
 
@@ -317,11 +388,31 @@ show_status() {
         gpu_mode="integrated"
     fi
 
+    # ThinkLMI BIOS attribute (staged vs active)
+    local thinklmi_attr="/sys/class/firmware-attributes/thinklmi/attributes/GraphicsDevice"
+    local bios_attr=""
+    local bios_pending=false
+    if [[ -d "$thinklmi_attr" ]]; then
+        bios_attr=$(sudo cat "$thinklmi_attr/current_value")
+        # Compare ThinkLMI attribute with detected hardware state
+        if [[ "$bios_attr" == "DiscreteGfx" && "$gpu_mode" != "discrete" ]]; then
+            bios_pending=true
+        elif [[ "$bios_attr" == "SwitchableGfx" && "$gpu_mode" != "hybrid" ]]; then
+            bios_pending=true
+        fi
+    fi
+
     echo ""
     echo -e "${BLUE}Power Mode Status${NC}"
     echo "---------------------------------------------"
     echo -e "Configured mode:  ${GREEN}$current_mode${NC}"
     echo -e "BIOS GPU mode:    ${GREEN}$gpu_mode${NC}"
+    if [[ -n "$bios_attr" ]]; then
+        echo -e "ThinkLMI setting: ${GREEN}$bios_attr${NC}"
+        if [[ "$bios_pending" == true ]]; then
+            echo -e "                  ${YELLOW}(change pending — reboot to apply)${NC}"
+        fi
+    fi
     echo ""
 
     # Mode descriptions
@@ -361,6 +452,15 @@ show_status() {
         echo "  nvidia-persistenced:    active"
     else
         echo "  nvidia-persistenced:    inactive"
+    fi
+
+    # nvidia-powerd (Dynamic Boost)
+    if systemctl is-active --quiet nvidia-powerd; then
+        echo "  nvidia-powerd:          active"
+    elif systemctl is-enabled --quiet nvidia-powerd 2>/dev/null; then
+        echo "  nvidia-powerd:          enabled (inactive)"
+    else
+        echo "  nvidia-powerd:          disabled"
     fi
 
     # Power profile
@@ -483,9 +583,9 @@ main() {
             echo ""
             echo "Without arguments, launches interactive mode with gum."
             echo ""
-            echo "BIOS Graphics Modes:"
-            echo "  performance requires: BIOS → Config → Display → 'Discrete Graphics'"
-            echo "  balanced/battery use: BIOS → Config → Display → 'Hybrid Graphics'"
+            echo "BIOS Graphics Modes (automated via ThinkLMI when available):"
+            echo "  performance → DiscreteGfx (NVIDIA only, staged on next reboot)"
+            echo "  balanced/battery → SwitchableGfx (hybrid, staged on next reboot)"
             ;;
         *)
             print_error "Unknown command: $1"
