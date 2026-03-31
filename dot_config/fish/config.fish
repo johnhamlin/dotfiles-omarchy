@@ -20,7 +20,7 @@ bind \cn history-prefix-search-forward
 # Ctrl+. to accept next word of autosuggestion (requires kitty keybind)
 bind -M insert \e\[46\;5u forward-word
 
-# Re-enable fzf process search (omarchy disables it, Ctrl+Alt+P conflicts with Fcitx5 preedit)
+# fzf process search (Ctrl+Alt+P conflicts with Fcitx5 preedit, so rebind)
 fzf_configure_bindings --processes=\e\ck
 
 # Disable flow control so Ctrl+S works, then bind to sudo toggle

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy-power-mode - Switch between performance, balanced, and battery power profiles
+# power-mode - Switch between performance, balanced, and battery power profiles
 # Requires reboot to fully apply changes
 #
 # Modes:
@@ -11,8 +11,8 @@
 set -euo pipefail
 
 # Paths
-PROFILES_DIR="$HOME/.config/omarchy/power-profiles"
-STATE_FILE="$HOME/.local/state/omarchy/power-mode"
+PROFILES_DIR="$HOME/.config/power-profiles"
+STATE_FILE="$HOME/.local/state/power-mode"
 ENVS_CONF="$HOME/.config/hypr/envs.conf"
 MODPROBE_DEST="/etc/modprobe.d/nvidia-power.conf"
 UDEV_DEST="/etc/udev/rules.d/80-nvidia-pm.rules"
@@ -500,7 +500,7 @@ interactive_mode() {
     current_mode=$(get_current_mode)
 
     if ! command -v gum &> /dev/null; then
-        print_error "gum is not installed. Use: omarchy-power-mode performance|balanced|battery"
+        print_error "gum is not installed. Use: power-mode performance|balanced|battery"
         exit 1
     fi
 
@@ -572,7 +572,7 @@ main() {
             interactive_mode
             ;;
         -h|--help)
-            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            echo "Usage: power-mode [performance|balanced|battery|status|get]"
             echo ""
             echo "Commands:"
             echo "  performance  BIOS Discrete mode, dGPU only, for docked workstation use"
@@ -589,7 +589,7 @@ main() {
             ;;
         *)
             print_error "Unknown command: $1"
-            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            echo "Usage: power-mode [performance|balanced|battery|status|get]"
             exit 1
             ;;
     esac

@@ -2,7 +2,7 @@
 
 ## 1. Fuzzy Search (fzf.fish) — your biggest productivity lever
 
-Installed system-wide by omarchy-fish. These work in both insert and normal mode.
+Provided by fzf.fish plugin. These work in both insert and normal mode.
 
 | Shortcut | What it does | Mnemonic |
 |---|---|---|
@@ -59,7 +59,7 @@ These work regardless of plugins:
 
 ## 4. Vi Mode (normal mode)
 
-You're in vi mode (set by omarchy's `init.fish`). Press **Escape** to enter normal mode from insert mode.
+You're in vi mode. Press **Escape** to enter normal mode from insert mode.
 
 ### Navigation
 
@@ -121,7 +121,7 @@ You're in vi mode (set by omarchy's `init.fish`). Press **Escape** to enter norm
 
 ## 6. Autopair (automatic bracket/quote pairing)
 
-Installed by omarchy-fish. When you type an opening bracket or quote, the closing one is auto-inserted:
+When you type an opening bracket or quote, the closing one is auto-inserted:
 
 | Type | Auto-pairs |
 |---|---|
@@ -133,7 +133,7 @@ Installed by omarchy-fish. When you type an opening bracket or quote, the closin
 | **Backspace** on empty pair | Deletes both |
 | Type closing char | Skips over it if already present |
 
-## 7. Omarchy Vendor Functions (short command aliases)
+## 7. Vendor Functions (short command aliases)
 
 These aren't keybindings but short commands that save keystrokes:
 

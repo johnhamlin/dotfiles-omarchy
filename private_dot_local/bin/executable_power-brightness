@@ -1,0 +1,13 @@
+#!/bin/bash
+# Adjust brightness based on AC power state
+
+BRIGHTNESS_BATTERY="10%"
+BRIGHTNESS_AC="100%"
+
+ac_online=$(cat /sys/class/power_supply/AC/online 2>/dev/null)
+
+if [[ "$ac_online" == "1" ]]; then
+  brightnessctl set "$BRIGHTNESS_AC"
+else
+  brightnessctl set "$BRIGHTNESS_BATTERY"
+fi

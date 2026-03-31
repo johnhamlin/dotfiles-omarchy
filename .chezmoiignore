@@ -3,3 +3,7 @@ packages-explicit.txt
 packages-aur.txt
 MIGRATION.md
 keyd/
+
+{{ if ne .formFactor "laptop" }}
+private_dot_local/bin/executable_power-mode
+{{ end }}
