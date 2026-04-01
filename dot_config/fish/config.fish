@@ -1,9 +1,7 @@
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
-# overwrite greeting
-# potentially disabling fastfetch
+# Disable default greeting
 function fish_greeting
-    # smth smth
 end
 
 theme_tokyonight night
@@ -20,7 +18,7 @@ bind \cn history-prefix-search-forward
 # Ctrl+. to accept next word of autosuggestion (requires kitty keybind)
 bind -M insert \e\[46\;5u forward-word
 
-# Re-enable fzf process search (omarchy disables it, Ctrl+Alt+P conflicts with Fcitx5 preedit)
+# fzf process search on Ctrl+Alt+K (default Ctrl+Alt+P conflicts with Fcitx5 preedit)
 fzf_configure_bindings --processes=\e\ck
 
 # Disable flow control so Ctrl+S works, then bind to sudo toggle

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a LazyVim configuration for Neovim running on Omarchy Linux. The config extends LazyVim with custom plugins and integrations.
+This is a LazyVim configuration for Neovim running on CachyOS + HyDE. The config extends LazyVim with custom plugins and integrations.
 
 ## Key Commands
 
@@ -44,10 +44,8 @@ AI: claudecode, copilot | Languages: typescript, angular, ember, go, rust, pytho
 
 **LSP restrictions** (`lsp-fixes.lua`): Ember LSP only attaches to projects with `ember-cli-build.js`. Angular LSP only attaches with `angular.json` or `nx.json`. The Angular TS plugin is conditionally injected into vtsls.
 
-### Omarchy Theme Integration
-- `all-themes.lua` - Lazy-loads 14 colorschemes for hot-reload availability
-- `omarchy-theme-hotreload.lua` - Watches for `:Lazy reload` and applies theme from `plugins/theme.lua` (external file managed by Omarchy)
-- Theme changes trigger: highlight clear, colorscheme load, transparency reapplication, ColorScheme/VimEnter autocmds
+### Theme
+- `theme.lua` - Sets tokyonight-night colorscheme
 
 ### Completion (blink.cmp)
 - Config in `lua/plugins/blink.lua`
@@ -81,7 +79,6 @@ AI: claudecode, copilot | Languages: typescript, angular, ember, go, rust, pytho
 
 ## External Dependencies
 
-- Omarchy manages `plugins/theme.lua` and transparency settings
 - Obsidian vault: `~/Documents/notes` (shared with Obsidian app, templates in `templates/`)
 - markdown_oxide LSP excluded from vault (obsidian.nvim owns it); see `nvim-lspconfig.lua`
 - LeetCode uses TypeScript by default
