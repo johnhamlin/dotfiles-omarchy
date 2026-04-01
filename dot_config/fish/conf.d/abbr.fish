@@ -71,6 +71,7 @@ abbr -a -- dcp 'docker compose pull'
 # Etc
 abbr -a -- l 'eza -lh --icons --git'
 abbr -a -- v nvim
+abbr -a -- n nvim
 abbr -a -- cm chezmoi
 abbr -a -- se sudoedit
 abbr -a -- nr 'npm run'

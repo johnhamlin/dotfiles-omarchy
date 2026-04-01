@@ -6,6 +6,7 @@
 # HyDE sources userprefs.conf for user overrides, so our overrides win.
 #
 # Hash triggers (run_onchange_ re-runs when any of these change):
+# {{ include "dot_config/kitty/custom.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/unbind.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/appearance.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/input.conf" | sha256sum }}
@@ -44,3 +45,10 @@ source = ~/.config/hypr-custom/bindings/utilities.conf
 EOF
 
 echo "Updated $USERPREFS"
+
+# Ensure kitty.conf includes our custom.conf
+KITTY_CONF="$HOME/.config/kitty/kitty.conf"
+if [[ -f "$KITTY_CONF" ]] && ! grep -q 'include custom.conf' "$KITTY_CONF"; then
+  echo 'include custom.conf' >> "$KITTY_CONF"
+  echo "Added 'include custom.conf' to $KITTY_CONF"
+fi
