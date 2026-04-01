@@ -177,6 +177,8 @@
 
 20. **Fish shell in kitty**: HyDE uses zsh as the login shell (required for HyDE's shell integration). Our `kitty/custom.conf` sets `shell /usr/bin/fish` so kitty launches fish as the interactive shell. No changes to the system login shell needed.
 
+21. **Terminal and fish colors**: HyDE's wallbash handles terminal color theming. For fish-specific syntax highlighting colors, install and configure a fish theme via `fisher` after the initial apply (e.g., `fisher install folke/tokyonight.nvim` and `theme_tokyonight night`). Terminal color schemes (kitty, ghostty, alacritty) are managed by HyDE's theme system.
+
 ## Laptop-Specific Setup
 
 21. **NVIDIA power management** (ThinkPad P1 Gen4 or similar hybrid GPU laptops):
@@ -215,7 +217,7 @@
 - GTK/QT theming — handled by HyDE's wallbash theme system
 
 ### What We Override (via userprefs.conf bridge)
-- Appearance: 0 gaps, Tokyo Night borders, animations
+- Appearance: 0 gaps, neutral border defaults (HyDE wallbash sets colors), animations
 - Keybindings: vim HJKL, app launchers, media keys with swayosd
 - Window rules: 25+ app-specific rules
 - Input: compose:caps, repeat rate, touchpad settings
