@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy-power-mode - Switch between performance, balanced, and battery power profiles
+# power-mode - Switch between performance, balanced, and battery power profiles
 # Requires reboot to fully apply changes
 #
 # Modes:
@@ -11,9 +11,9 @@
 set -euo pipefail
 
 # Paths
-PROFILES_DIR="$HOME/.config/omarchy/power-profiles"
-STATE_FILE="$HOME/.local/state/omarchy/power-mode"
-ENVS_CONF="$HOME/.config/hypr/envs.conf"
+PROFILES_DIR="$HOME/.config/power-profiles"
+STATE_FILE="$HOME/.local/state/power-mode"
+ENVS_CONF="$HOME/.config/hypr-custom/envs.conf"
 MODPROBE_DEST="/etc/modprobe.d/nvidia-power.conf"
 UDEV_DEST="/etc/udev/rules.d/80-nvidia-pm.rules"
 
@@ -263,8 +263,6 @@ set_bios_gpu_mode() {
 }
 
 # Enable/disable nvidia-powerd (Dynamic Boost)
-# Dynamic Boost requires iGPU+dGPU cooperation, so it only works in hybrid mode.
-# In discrete mode it can't communicate with SBIOS, causing GPU to stay at P0 and fans to run full blast.
 configure_nvidia_powerd() {
     local mode="$1"
 
@@ -306,9 +304,6 @@ set_power_profile() {
 }
 
 # Set default browser based on mode
-# Performance: vivaldi-nvidia wrapper for VA-API hardware video decode on dGPU
-# Balanced: vivaldi-intel wrapper to keep dGPU asleep (iGPU VA-API)
-# Battery: vivaldi-intel wrapper (iGPU hw decode uses less power than CPU decode)
 set_default_browser() {
     local mode="$1"
     local browser
@@ -319,7 +314,6 @@ set_default_browser() {
         *)           browser="vivaldi-intel.desktop" ;;
     esac
 
-    # Check if the desktop file exists (local wrappers first, then system)
     local desktop_file
     if [[ -f "$HOME/.local/share/applications/$browser" ]]; then
         desktop_file="$HOME/.local/share/applications/$browser"
@@ -394,7 +388,6 @@ show_status() {
     local bios_pending=false
     if [[ -d "$thinklmi_attr" ]]; then
         bios_attr=$(sudo cat "$thinklmi_attr/current_value")
-        # Compare ThinkLMI attribute with detected hardware state
         if [[ "$bios_attr" == "DiscreteGfx" && "$gpu_mode" != "discrete" ]]; then
             bios_pending=true
         elif [[ "$bios_attr" == "SwitchableGfx" && "$gpu_mode" != "hybrid" ]]; then
@@ -415,24 +408,20 @@ show_status() {
     fi
     echo ""
 
-    # Mode descriptions
     echo "Available modes:"
     echo "  performance - BIOS Discrete, dGPU only, docked workstation"
     echo "  balanced    - BIOS Hybrid, iGPU primary, dGPU for offload"
     echo "  battery     - BIOS Hybrid, iGPU only, max battery life"
     echo ""
 
-    # Check actual system state
     echo "Current system state:"
 
-    # NVIDIA module loaded?
     if [[ -d /sys/module/nvidia ]]; then
         echo "  NVIDIA module:          loaded"
     else
         echo "  NVIDIA module:          not loaded"
     fi
 
-    # DynamicPowerManagement - check modprobe config since sysfs path may not exist
     if [[ -f "$MODPROBE_DEST" ]]; then
         local dpm_config
         dpm_config=$(grep -oP 'NVreg_DynamicPowerManagement=\K[^ ]+' "$MODPROBE_DEST" 2>/dev/null || echo "not set")
@@ -447,14 +436,12 @@ show_status() {
         echo "  DynamicPowerManagement: (no config installed)"
     fi
 
-    # nvidia-persistenced
     if systemctl is-active --quiet nvidia-persistenced; then
         echo "  nvidia-persistenced:    active"
     else
         echo "  nvidia-persistenced:    inactive"
     fi
 
-    # nvidia-powerd (Dynamic Boost)
     if systemctl is-active --quiet nvidia-powerd; then
         echo "  nvidia-powerd:          active"
     elif systemctl is-enabled --quiet nvidia-powerd 2>/dev/null; then
@@ -463,26 +450,22 @@ show_status() {
         echo "  nvidia-powerd:          disabled"
     fi
 
-    # Power profile
     if command -v powerprofilesctl &> /dev/null; then
         local profile
         profile=$(powerprofilesctl get)
         echo "  Power profile:          $profile"
     fi
 
-    # Default browser
     local default_browser
     default_browser=$(xdg-settings get default-web-browser 2>/dev/null || echo "unknown")
     echo "  Default browser:        $default_browser"
 
-    # GPU runtime status
     if [[ -f /sys/bus/pci/devices/0000:01:00.0/power/runtime_status ]]; then
         local gpu_status
         gpu_status=$(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status)
         echo "  GPU runtime status:     $gpu_status"
     fi
 
-    # Key environment variables
     echo ""
     echo "Key environment variables:"
     local vars=("AQ_DRM_DEVICES" "NVD_BACKEND" "LIBVA_DRIVER_NAME" "__GLX_VENDOR_LIBRARY_NAME" "VDPAU_DRIVER")
@@ -500,7 +483,7 @@ interactive_mode() {
     current_mode=$(get_current_mode)
 
     if ! command -v gum &> /dev/null; then
-        print_error "gum is not installed. Use: omarchy-power-mode performance|balanced|battery"
+        print_error "gum is not installed. Use: power-mode performance|balanced|battery"
         exit 1
     fi
 
@@ -517,7 +500,6 @@ interactive_mode() {
         "status" \
         "cancel")
 
-    # Extract mode name from choice
     local mode
     mode=$(echo "$choice" | awk '{print $1}')
 
@@ -572,7 +554,7 @@ main() {
             interactive_mode
             ;;
         -h|--help)
-            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            echo "Usage: power-mode [performance|balanced|battery|status|get]"
             echo ""
             echo "Commands:"
             echo "  performance  BIOS Discrete mode, dGPU only, for docked workstation use"
@@ -589,7 +571,7 @@ main() {
             ;;
         *)
             print_error "Unknown command: $1"
-            echo "Usage: omarchy-power-mode [performance|balanced|battery|status|get]"
+            echo "Usage: power-mode [performance|balanced|battery|status|get]"
             exit 1
             ;;
     esac
