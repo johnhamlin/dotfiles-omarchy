@@ -5,6 +5,7 @@
 # XCompose
 env = XCOMPOSEFILE,~/.XCompose
 
+{{ if eq .gpu "nvidia" -}}
 # NVIDIA
 {{ if eq .machine "thinkpad-p1-gen4" -}}
 # Performance Mode (BIOS Discrete Graphics)
@@ -18,3 +19,4 @@ env = VDPAU_DRIVER,nvidia
 env = __GL_MaxFramesAllowed,1
 env = __GL_GSYNC_ALLOWED,1
 env = MOZ_DISABLE_RDD_SANDBOX,1
+{{ end -}}

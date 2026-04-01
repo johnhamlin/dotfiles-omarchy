@@ -23,6 +23,7 @@
    [data]
        machine = "desktop-name"      # e.g. "thinkpad-p1-gen4", "desktop-amd"
        formFactor = "desktop"        # "desktop" or "laptop"
+       gpu = "amd"                   # "nvidia", "amd", or "intel"
 
    [edit]
        command = "nvim"
@@ -188,9 +189,8 @@
 
 22. **Vivaldi browser wrappers** (if using Vivaldi with NVIDIA):
     ```bash
-    # Create desktop files for GPU-specific browser launching
-    # power-mode switches the default browser between these
-    # See ~/.local/share/applications/vivaldi-{nvidia,intel}.desktop
+    # power-mode creates desktop files for GPU-specific browser launching
+    # and switches the default browser between them
     ```
 
 23. **Verify laptop-specific features**:
@@ -219,7 +219,7 @@
 - Keybindings: vim HJKL, app launchers, media keys with swayosd
 - Window rules: 25+ app-specific rules
 - Input: compose:caps, repeat rate, touchpad settings
-- Env vars: NVIDIA, XCompose
+- Env vars: NVIDIA (conditional on gpu="nvidia"), XCompose
 - Autostart: fcitx5, swayosd, hyprsunset
 
 ### HyDE Features Preserved (relocated keys)

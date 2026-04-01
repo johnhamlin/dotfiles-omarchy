@@ -216,10 +216,6 @@ obs-studio
 obsidian
 octopi
 okular
-omarchy-fish
-omarchy-keyring
-omarchy-nvim
-omarchy-walker
 opencl-nvidia
 opencode
 openssh
