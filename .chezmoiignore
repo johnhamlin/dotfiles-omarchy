@@ -1,5 +1,28 @@
+# Always ignored
 .config/nvim/lazy-lock.json
 packages-explicit.txt
 packages-aur.txt
 MIGRATION.md
-keyd/
+windows-terminal-settings.json
+
+# ML4W-owned — do not manage
+.config/hypr/
+
+{{ if eq .chezmoi.os "windows" }}
+# Linux-only
+.config/hypr-custom/
+.config/kitty/
+.config/fish/
+.config/alacritty/
+.config/ghostty/
+{{ end }}
+
+{{ if ne .chezmoi.os "windows" }}
+# Windows-only
+.glzr/
+{{ end }}
+
+{{ if ne .formFactor "laptop" }}
+private_dot_local/bin/executable_power-mode
+private_dot_local/bin/executable_power-brightness
+{{ end }}

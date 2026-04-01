@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Toggle waybar visibility — delegate to ML4W's script if available
+
+if [[ -x "$HOME/.config/waybar/toggle.sh" ]]; then
+  exec "$HOME/.config/waybar/toggle.sh"
+fi
+
+# Fallback: simple toggle
+if pgrep -x waybar >/dev/null; then
+  pkill -x waybar
+else
+  uwsm-app -- waybar >/dev/null 2>&1 &
+fi

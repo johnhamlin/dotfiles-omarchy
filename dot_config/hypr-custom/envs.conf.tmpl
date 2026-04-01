@@ -1,0 +1,20 @@
+# Environment variables — only vars ML4W doesn't already set.
+# ML4W sets: XDG_*, QT_QPA_PLATFORM, GDK_BACKEND, XCURSOR_SIZE, HYPRCURSOR_SIZE,
+#            ELECTRON_OZONE_PLATFORM_HINT, cursor size, etc.
+
+# XCompose
+env = XCOMPOSEFILE,~/.XCompose
+
+# NVIDIA
+{{ if eq .machine "thinkpad-p1-gen4" -}}
+# Performance Mode (BIOS Discrete Graphics)
+# Requires: BIOS -> Config -> Display -> Graphics Device -> "Discrete Graphics"
+# No AQ_DRM_DEVICES needed — only one GPU exists in discrete mode
+{{ end -}}
+env = NVD_BACKEND,direct
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = VDPAU_DRIVER,nvidia
+env = __GL_MaxFramesAllowed,1
+env = __GL_GSYNC_ALLOWED,1
+env = MOZ_DISABLE_RDD_SANDBOX,1

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Lock the screen using hyprlock and lock 1Password.
+
+pidof hyprlock || hyprlock &
+
+# Set keyboard layout to default (first layout)
+hyprctl switchxkblayout all 0 > /dev/null 2>&1
+
+# Ensure 1password is locked
+if pgrep -x "1password" >/dev/null; then
+  1password --lock &
+fi

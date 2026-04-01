@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Managed by chezmoi — writes source lines into ML4W's custom.conf
+# to bridge our hypr-custom/ overrides into Hyprland's config.
+#
+# ML4W's hyprland.conf sources conf/custom.conf LAST, so our overrides win.
+#
+# Hash triggers (run_onchange_ re-runs when any of these change):
+# {{ include "dot_config/hypr-custom/unbind.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/appearance.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/input.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/envs.conf.tmpl" | sha256sum }}
+# {{ include "dot_config/hypr-custom/autostart.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/windowrules/base.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/windowrules/apps.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/tiling.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/apps.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/media.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/utilities.conf" | sha256sum }}
+
+set -euo pipefail
+
+CUSTOM_CONF="$HOME/.config/hypr/conf/custom.conf"
+
+# Only run if ML4W's conf directory exists
+if [[ ! -d "$HOME/.config/hypr/conf" ]]; then
+  echo "ML4W conf directory not found, skipping custom.conf setup"
+  exit 0
+fi
+
+cat > "$CUSTOM_CONF" << 'EOF'
+# Managed by chezmoi — edit files in ~/.config/hypr-custom/ instead
+source = ~/.config/hypr-custom/unbind.conf
+source = ~/.config/hypr-custom/appearance.conf
+source = ~/.config/hypr-custom/input.conf
+source = ~/.config/hypr-custom/envs.conf
+source = ~/.config/hypr-custom/autostart.conf
+source = ~/.config/hypr-custom/windowrules/base.conf
+source = ~/.config/hypr-custom/windowrules/apps.conf
+source = ~/.config/hypr-custom/bindings/tiling.conf
+source = ~/.config/hypr-custom/bindings/apps.conf
+source = ~/.config/hypr-custom/bindings/media.conf
+source = ~/.config/hypr-custom/bindings/utilities.conf
+EOF
+
+echo "Updated $CUSTOM_CONF"
