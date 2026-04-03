@@ -1,4 +1,6 @@
+{{ if not (contains "microsoft" .chezmoi.kernel.osrelease) -}}
 source /usr/share/cachyos-fish-config/cachyos-config.fish
+{{ end -}}
 mise activate fish | source
 
 # Zoxide

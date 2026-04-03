@@ -381,3 +381,141 @@ uwsm-app -- swayosd-server    # start manually
 cat ~/.config/kitty/custom.conf | grep shell
 # HyDE uses zsh as login shell — fish is only for kitty interactive use
 ```
+
+---
+
+# WSL Setup Checklist
+
+## Prerequisites
+- [ ] Windows 11 with WSL2 enabled
+- [ ] Ubuntu installed in WSL2 (`wsl --install -d Ubuntu`)
+- [ ] SSH keys available (copy from Windows host or export from 1Password)
+- [ ] JetBrainsMono Nerd Font installed on Windows (for Windows Terminal)
+
+## Core Setup
+
+1. **Install chezmoi + dependencies**
+   ```bash
+   sudo apt update && sudo apt install -y git fish tmux
+   sh -c "$(curl -fsLS get.chezmoi.io)"
+   ```
+
+2. **Initialize dotfiles**
+   ```bash
+   chezmoi init johnhamlin/dotfiles-omarchy --branch wsl
+   ```
+
+3. **Configure machine identity** — edit `~/.config/chezmoi/chezmoi.toml`:
+   ```toml
+   [data]
+       machine = "work-wsl"
+       formFactor = "desktop"
+       gpu = "none"
+       gitEmail = "john@workdomain.com"
+
+   [edit]
+       command = "nvim"
+   ```
+
+4. **Preview and apply**
+   ```bash
+   chezmoi diff
+   chezmoi apply
+   ```
+
+5. **Set fish as default shell**
+   ```bash
+   chsh -s /usr/bin/fish
+   ```
+
+6. **Install CLI tools**
+   ```bash
+   # mise (runtime manager)
+   curl https://mise.jdx.dev/install.sh | sh
+   mise install
+
+   # starship prompt
+   curl -sS https://starship.rs/install.sh | sh
+
+   # Core tools
+   sudo apt install -y fzf ripgrep bat zoxide gh neovim
+
+   # eza (apt may not have it — use cargo or the eza deb repo)
+   # https://github.com/eza-community/eza/blob/main/INSTALL.md
+
+   # yazi (from GitHub releases or cargo)
+   # https://yazi-rs.github.io/docs/installation
+
+   # fisher (fish plugin manager) + fzf.fish
+   fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
+   fish -c "fisher install PatrickF1/fzf.fish"
+   ```
+
+7. **Authenticate GitHub CLI**
+   ```bash
+   gh auth login
+   ```
+
+8. **Install 1Password CLI** (optional, for `load-api-keys`):
+   ```bash
+   # https://developer.1password.com/docs/cli/get-started/#install
+   ```
+
+## Windows Terminal Configuration
+
+Merge settings from `windows-terminal-settings.json` (in repo root) into Windows Terminal's `settings.json` (open with `Ctrl+Shift+,`):
+
+- **Default profile**: Set to your Ubuntu WSL profile
+- **Auto-launch tmux**: Profile commandline runs `tmux new-session -A -s main`
+- **Font**: JetBrainsMono Nerd Font, size 9
+- **Unbind conflicting keys**: `Ctrl+B` (tmux prefix), `Ctrl+H/J/K/L` (smart-splits), `Alt+H/L` (tab switch), `Ctrl+Shift+C/V` (use `Ctrl/Shift+Insert` instead)
+
+## Keybinding Cheat Sheet: Kitty vs tmux
+
+All splits and tabs are managed by tmux inside Windows Terminal.
+
+| Action | Kitty (CachyOS) | tmux (WSL) |
+|--------|-----------------|------------|
+| **Prefix key** | `Ctrl+A` | `Ctrl+B` |
+| New tab | `Ctrl+A > c` | `Ctrl+B c` |
+| Rename tab | `Ctrl+A > ,` | `Ctrl+B r` |
+| Horizontal split | `Ctrl+A > s` | `Ctrl+B v` |
+| Vertical split | `Ctrl+A > v` | `Ctrl+B h` |
+| Zoom pane | `Ctrl+A > z` / `F1` | `Ctrl+B z` / `F1` |
+| Close pane | `Ctrl+A > x` | `Ctrl+B x` |
+| Close tab | `Ctrl+A > q` | `Ctrl+B x` (kill-window) |
+| Jump to tab N | `Ctrl+A > 1-9` | `Ctrl+B 1-9` |
+| Next/prev tab | `Alt+L` / `Alt+H` | `Alt+L` / `Alt+H` |
+| Navigate splits | `Ctrl+H/J/K/L` | `Ctrl+H/J/K/L` (smart-splits) |
+| Swap pane | `Ctrl+A > Shift+H/J/K/L` | `Ctrl+B Shift+H/J/K/L` |
+| Cycle layout | `Ctrl+A > Space` | `Ctrl+B Space` |
+| Detach session | — | `Ctrl+B d` |
+| Reattach session | — | `tmux attach` |
+
+## What You Get
+- Fish shell with vim bindings, abbreviations, fzf, zoxide
+- Neovim (LazyVim) with full plugin suite and OSC 52 clipboard
+- Tmux with vim-aware pane switching (smart-splits.nvim)
+- Starship prompt
+- Git config with work email
+- Mise for runtime management (Node, Go, Bun, Java)
+- IdeaVim config (for JetBrains IDEs on Windows host)
+
+## What Is Excluded (desktop-only)
+Controlled by `.chezmoiignore` WSL detection — these files exist in the repo but are never deployed on WSL:
+- Hyprland / HyDE configs
+- Kitty, Alacritty, Ghostty terminal configs
+- Keyd keyboard remapping
+- Desktop scripts (gaming-mode, lock-screen, power management, etc.)
+- Vivaldi browser flags
+
+## WSL-Specific Notes
+
+### Abbreviation editing
+On WSL, `abbr.fish` is a chezmoi template. The `abbr-edit` function uses `chezmoi add` which would strip template markers. For editing abbreviations, use `chezmoi edit ~/.config/fish/conf.d/abbr.fish` instead.
+
+### Clipboard
+Neovim uses OSC 52 for clipboard, which works in Windows Terminal. Copy/paste between WSL and Windows should work out of the box.
+
+### Tmux sessions persist across terminal closes
+Since Windows Terminal auto-attaches to an existing tmux session (`tmux new-session -A -s main`), closing and reopening the terminal reconnects to your running session.

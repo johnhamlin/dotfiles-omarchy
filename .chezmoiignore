@@ -22,8 +22,21 @@ windows-terminal-settings.json
 .glzr/
 {{ end }}
 
+{{ if contains "microsoft" .chezmoi.kernel.osrelease }}
+# WSL — exclude desktop-environment-specific files
+.config/hypr-custom/
+.config/hyde/
+.config/kitty/
+.config/alacritty/
+.config/ghostty/
+.config/vivaldi-stable.conf
+keyd/
+.local/bin/
+.local/share/applications/
+{{ end }}
+
 {{ if ne .formFactor "laptop" }}
-private_dot_local/bin/executable_power-mode
-private_dot_local/bin/executable_power-brightness
+.local/bin/power-mode
+.local/bin/power-brightness
 keyd/internal.conf
 {{ end }}

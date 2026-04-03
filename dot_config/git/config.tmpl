@@ -34,7 +34,7 @@
 	helper = !/usr/bin/gh auth git-credential
 [user]
 	name = John Hamlin
-	email = johnhamlin@gmail.com
+	email = {{ dig "gitEmail" "johnhamlin@gmail.com" . }}
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
