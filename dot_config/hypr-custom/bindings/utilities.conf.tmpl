@@ -8,10 +8,9 @@ bindd = SUPER, C, Universal copy, sendshortcut, CTRL, Insert,
 bindd = SUPER, V, Universal paste, sendshortcut, SHIFT, Insert,
 bindd = SUPER, X, Universal cut, sendshortcut, CTRL, X,
 
-# Lock
-bindd = SUPER, ESCAPE, Lock screen, exec, lock-screen
+# Power menu
+bindd = SUPER, ESCAPE, Power menu, exec, hyde-shell logoutlaunch
 bindld = , XF86PowerOff, Lock screen, exec, lock-screen
-bindd = SUPER CTRL, L, Lock screen, exec, lock-screen
 
 # Screenshots
 bindd = , PRINT, Screenshot, exec, hyprshot -m region
@@ -51,5 +50,7 @@ bindd = SUPER CTRL, K, Search keybindings, exec, pkill -x rofi || hyde-shell key
 bindd = SUPER CTRL ALT, T, Show time, exec, notify-send "    $(date +"%A %H:%M  —  %d %B W%V %Y")"
 bindd = , XF86Calculator, Calculator, exec, gnome-calculator
 
+{{ if eq .formFactor "laptop" }}
 # Hardware toggles
 bindd = SUPER SHIFT, I, Toggle internal keyboard, exec, toggle-internal-keyboard
+{{ end }}

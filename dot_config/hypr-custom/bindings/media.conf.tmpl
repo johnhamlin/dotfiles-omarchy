@@ -11,10 +11,12 @@ bindeld = ,XF86AudioMicMute, Mute microphone, exec, $osdclient --input-volume mu
 bindeld = ,XF86MonBrightnessUp, Brightness up, exec, $osdclient --brightness raise
 bindeld = ,XF86MonBrightnessDown, Brightness down, exec, $osdclient --brightness lower
 
+{{ if eq .formFactor "laptop" }}
 # Keyboard brightness
 bindeld = ,XF86KbdBrightnessUp, Keyboard brightness up, exec, brightnessctl -d '*::kbd_backlight' set +1
 bindeld = ,XF86KbdBrightnessDown, Keyboard brightness down, exec, brightnessctl -d '*::kbd_backlight' set 1-
 bindld = ,XF86KbdLightOnOff, Keyboard backlight cycle, exec, brightnessctl -d '*::kbd_backlight' set +1
+{{ end }}
 
 # Precise 1% adjustments
 bindeld = ALT, XF86AudioRaiseVolume, Volume up precise, exec, $osdclient --output-volume +1

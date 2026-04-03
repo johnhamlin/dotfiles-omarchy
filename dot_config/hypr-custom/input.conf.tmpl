@@ -2,15 +2,16 @@ input {
     kb_layout = us
     kb_options = compose:caps
     follow_mouse = 1
-    sensitivity = 0
+    sensitivity = 0.3
     repeat_rate = 40
     repeat_delay = 600
-    numlock_by_default = true
+{{ if eq .formFactor "laptop" }}
 
     touchpad {
         natural_scroll = true
         scroll_factor = 0.4
     }
+{{ end }}
 }
 
 misc {
@@ -18,6 +19,12 @@ misc {
     mouse_move_enables_dpms = true
 }
 
-# Terminal scroll rules
+cursor {
+    no_hardware_cursors = {{ if eq .formFactor "desktop" }}true{{ else }}false{{ end }}
+}
+{{ if eq .formFactor "laptop" }}
+
+# Terminal touchpad scroll rules
 windowrule = match:class (Alacritty|kitty), scroll_touchpad 1.5
 windowrule = match:class com.mitchellh.ghostty, scroll_touchpad 0.2
+{{ end }}
