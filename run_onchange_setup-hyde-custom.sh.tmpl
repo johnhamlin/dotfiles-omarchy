@@ -9,15 +9,15 @@
 # {{ include "dot_config/kitty/custom.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/unbind.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/appearance.conf" | sha256sum }}
-# {{ include "dot_config/hypr-custom/input.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/input.conf.tmpl" | sha256sum }}
 # {{ include "dot_config/hypr-custom/envs.conf.tmpl" | sha256sum }}
 # {{ include "dot_config/hypr-custom/autostart.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/windowrules/base.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/windowrules/apps.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/bindings/tiling.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/bindings/apps.conf" | sha256sum }}
-# {{ include "dot_config/hypr-custom/bindings/media.conf" | sha256sum }}
-# {{ include "dot_config/hypr-custom/bindings/utilities.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/media.conf.tmpl" | sha256sum }}
+# {{ include "dot_config/hypr-custom/bindings/utilities.conf.tmpl" | sha256sum }}
 
 set -euo pipefail
 
@@ -45,6 +45,20 @@ source = ~/.config/hypr-custom/bindings/utilities.conf
 EOF
 
 echo "Updated $USERPREFS"
+
+# Neutralize HyDE's per-app opacity multipliers in windowrules.conf.
+# HyDE overwrites this file on theme changes, resetting opacity values like
+# "opacity 0.80 $& 0.80 $& 1". Since our appearance.conf sets global opacity
+# to 1.0 and our windowrules/apps.conf uses "override", these $& multipliers
+# must be 1 to avoid compounding. This makes the fix self-healing.
+WINDOWRULES="$HOME/.config/hypr/windowrules.conf"
+if [[ -f "$WINDOWRULES" ]]; then
+  # "opacity 0.90 $& 0.75 $& 1" → "opacity 1 $& 1 $& 1"
+  sed -i -E 's/opacity [0-9.]+ \$& [0-9.]+ \$& [0-9.]+/opacity 1 $\& 1 $\& 1/g' "$WINDOWRULES"
+  # "opacity 0.80 0.80" → "opacity 1 1" (absolute rules without $&)
+  sed -i -E 's/opacity [0-9.]+ [0-9.]+,/opacity 1 1,/g' "$WINDOWRULES"
+  echo "Neutralized opacity values in $WINDOWRULES"
+fi
 
 # Ensure kitty.conf includes our custom.conf
 KITTY_CONF="$HOME/.config/kitty/kitty.conf"
