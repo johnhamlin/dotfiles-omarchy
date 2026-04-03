@@ -25,4 +25,5 @@ windows-terminal-settings.json
 {{ if ne .formFactor "laptop" }}
 private_dot_local/bin/executable_power-mode
 private_dot_local/bin/executable_power-brightness
+keyd/internal.conf
 {{ end }}

@@ -1,4 +1,11 @@
 source /usr/share/cachyos-fish-config/cachyos-config.fish
+mise activate fish | source
+
+# Zoxide
+zoxide init fish --cmd cd | source
+
+# Always use vim mode
+fish_vi_key_bindings
 
 # Disable default greeting
 function fish_greeting
