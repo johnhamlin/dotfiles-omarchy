@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Install Web App
+Comment=Install a website as a desktop web app
+Exec=xdg-terminal-exec -e manage-webapps install
+Icon=applications-internet
+Terminal=false
+Type=Application
+Categories=Network;Utility;
+Keywords=webapp;web;install;browser;
