@@ -6,17 +6,16 @@
 env = XCOMPOSEFILE,~/.XCompose
 
 {{ if eq .gpu "nvidia" -}}
-# NVIDIA
+# NVIDIA — only vars not already set by HyDE's nvidia.conf
+# HyDE sets: LIBVA_DRIVER_NAME, __GLX_VENDOR_LIBRARY_NAME, GBM_BACKEND
 {{ if eq .machine "thinkpad-p1-gen4" -}}
 # Performance Mode (BIOS Discrete Graphics)
 # Requires: BIOS -> Config -> Display -> Graphics Device -> "Discrete Graphics"
 # No AQ_DRM_DEVICES needed — only one GPU exists in discrete mode
 {{ end -}}
 env = NVD_BACKEND,direct
-env = LIBVA_DRIVER_NAME,nvidia
-env = __GLX_VENDOR_LIBRARY_NAME,nvidia
 env = VDPAU_DRIVER,nvidia
 env = __GL_MaxFramesAllowed,1
 env = __GL_GSYNC_ALLOWED,1
-env = MOZ_DISABLE_RDD_SANDBOX,1
+env = MOZ_DISABLE_RDD_SANDBOX,1  # Required for Firefox NVIDIA VA-API hw decode
 {{ end -}}
