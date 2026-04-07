@@ -1,0 +1,196 @@
+# GlazeWM configuration — mirrors Hyprland tiling bindings
+# Location on Windows: %userprofile%\.glzr\glazewm\config.yaml
+
+general:
+  startup_commands: []
+  focus_follows_cursor: false
+  cursor_follows_focus: false
+  toggle_workspace_on_refocus: false
+  hide_method: "cloak"
+
+# Gaps: 0 inner/outer matches Hyprland appearance.conf (gaps_in=0, gaps_out=0)
+gaps:
+  inner: 0
+  outer: 0
+
+window_effects:
+  focused_border:
+    enabled: true
+    color: "#8dbcff"
+    width: 2
+  unfocused_border:
+    enabled: true
+    color: "#585858"
+    width: 1
+  corner_style: "rounded"
+  hide_title_bar: true
+
+window_behavior:
+  initial_state: "tiling"
+  floating:
+    centered: true
+
+workspaces:
+  - name: "1"
+  - name: "2"
+  - name: "3"
+  - name: "4"
+  - name: "5"
+  - name: "6"
+  - name: "7"
+  - name: "8"
+  - name: "9"
+
+window_rules:
+  # Float common dialog/utility windows
+  - commands: ["set-floating"]
+    match:
+      - window_process: { equals: "1Password" }
+      - window_title: { regex: "Settings|Preferences|Properties|Options" }
+
+  # Don't manage these
+  - commands: ["ignore"]
+    match:
+      - window_process: { equals: "Zebar" }
+      - window_process: { equals: "PowerToys" }
+      - window_process: { regex: "PowerToys.*" }
+
+# Resize binding mode (enter with lwin+r, exit with Escape)
+binding_modes:
+  - name: "resize"
+    keybindings:
+      - commands: ["resize --width -2%"]
+        bindings: ["h", "left"]
+      - commands: ["resize --width +2%"]
+        bindings: ["l", "right"]
+      - commands: ["resize --height +2%"]
+        bindings: ["j", "down"]
+      - commands: ["resize --height -2%"]
+        bindings: ["k", "up"]
+      - commands: ["wm-disable-binding-mode --name resize"]
+        bindings: ["escape", "return"]
+
+keybindings:
+  # ==========================================
+  # Focus navigation — matches SUPER+H/J/K/L
+  # NOTE: Win+L is hardcoded by Windows to lock screen.
+  #       Use Win+; (semicolon) as alternative for focus-right.
+  # ==========================================
+  - commands: ["focus --direction left"]
+    bindings: ["lwin+h"]
+  - commands: ["focus --direction down"]
+    bindings: ["lwin+j"]
+  - commands: ["focus --direction up"]
+    bindings: ["lwin+k"]
+  - commands: ["focus --direction right"]
+    bindings: ["lwin+oem_1"]  # Win+; (semicolon) — Win+L is reserved
+
+  # Arrow key fallbacks
+  - commands: ["focus --direction left"]
+    bindings: ["lwin+left"]
+  - commands: ["focus --direction right"]
+    bindings: ["lwin+right"]
+  - commands: ["focus --direction up"]
+    bindings: ["lwin+up"]
+  - commands: ["focus --direction down"]
+    bindings: ["lwin+down"]
+
+  # ==========================================
+  # Window movement — matches SUPER+SHIFT+H/J/K/L
+  # ==========================================
+  - commands: ["move --direction left"]
+    bindings: ["lwin+shift+h"]
+  - commands: ["move --direction down"]
+    bindings: ["lwin+shift+j"]
+  - commands: ["move --direction up"]
+    bindings: ["lwin+shift+k"]
+  - commands: ["move --direction right"]
+    bindings: ["lwin+shift+l"]
+
+  # Arrow key fallbacks
+  - commands: ["move --direction left"]
+    bindings: ["lwin+shift+left"]
+  - commands: ["move --direction right"]
+    bindings: ["lwin+shift+right"]
+  - commands: ["move --direction up"]
+    bindings: ["lwin+shift+up"]
+  - commands: ["move --direction down"]
+    bindings: ["lwin+shift+down"]
+
+  # ==========================================
+  # Resize mode — matches SUPER+R (Hyprland uses SUPER+[-/=])
+  # ==========================================
+  - commands: ["wm-enable-binding-mode --name resize"]
+    bindings: ["lwin+r"]
+
+  # ==========================================
+  # Workspaces — matches SUPER+1-9
+  # ==========================================
+  - commands: ["focus --workspace 1"]
+    bindings: ["lwin+1"]
+  - commands: ["focus --workspace 2"]
+    bindings: ["lwin+2"]
+  - commands: ["focus --workspace 3"]
+    bindings: ["lwin+3"]
+  - commands: ["focus --workspace 4"]
+    bindings: ["lwin+4"]
+  - commands: ["focus --workspace 5"]
+    bindings: ["lwin+5"]
+  - commands: ["focus --workspace 6"]
+    bindings: ["lwin+6"]
+  - commands: ["focus --workspace 7"]
+    bindings: ["lwin+7"]
+  - commands: ["focus --workspace 8"]
+    bindings: ["lwin+8"]
+  - commands: ["focus --workspace 9"]
+    bindings: ["lwin+9"]
+
+  # ==========================================
+  # Move window to workspace — matches SUPER+SHIFT+1-9
+  # ==========================================
+  - commands: ["move --workspace 1", "focus --workspace 1"]
+    bindings: ["lwin+shift+1"]
+  - commands: ["move --workspace 2", "focus --workspace 2"]
+    bindings: ["lwin+shift+2"]
+  - commands: ["move --workspace 3", "focus --workspace 3"]
+    bindings: ["lwin+shift+3"]
+  - commands: ["move --workspace 4", "focus --workspace 4"]
+    bindings: ["lwin+shift+4"]
+  - commands: ["move --workspace 5", "focus --workspace 5"]
+    bindings: ["lwin+shift+5"]
+  - commands: ["move --workspace 6", "focus --workspace 6"]
+    bindings: ["lwin+shift+6"]
+  - commands: ["move --workspace 7", "focus --workspace 7"]
+    bindings: ["lwin+shift+7"]
+  - commands: ["move --workspace 8", "focus --workspace 8"]
+    bindings: ["lwin+shift+8"]
+  - commands: ["move --workspace 9", "focus --workspace 9"]
+    bindings: ["lwin+shift+9"]
+
+  # ==========================================
+  # Window control — matches Hyprland bindings
+  # ==========================================
+  - commands: ["close"]
+    bindings: ["lwin+q"]
+  - commands: ["toggle-fullscreen"]
+    bindings: ["lwin+f"]
+  - commands: ["toggle-floating --centered"]
+    bindings: ["lwin+t"]
+  - commands: ["toggle-tiling-direction"]
+    bindings: ["lwin+ctrl+j"]
+
+  # ==========================================
+  # Workspace cycling — matches SUPER+TAB / SUPER+SHIFT+TAB
+  # ==========================================
+  - commands: ["focus --workspace next"]
+    bindings: ["lwin+tab"]
+  - commands: ["focus --workspace prev"]
+    bindings: ["lwin+shift+tab"]
+
+  # ==========================================
+  # WM management
+  # ==========================================
+  - commands: ["wm-reload-config"]
+    bindings: ["lwin+shift+r"]
+  - commands: ["wm-exit"]
+    bindings: ["lwin+shift+q"]

@@ -520,6 +520,33 @@ All splits and tabs are managed by tmux inside WezTerm.
 | Detach session | -- | `Ctrl+B d` |
 | Reattach session | -- | `tmux attach` |
 
+## GlazeWM (Tiling Window Manager)
+
+Replicates Hyprland's tiling WM behavior on Windows — `Super+H/J/K/L` focus navigation, workspaces, window movement.
+
+1. **Install GlazeWM** from [GitHub releases](https://github.com/glzr-io/glazewm/releases) or `winget install glzr-io.glazewm`
+2. **Config auto-deploys** via chezmoi to `%userprofile%\.glzr\glazewm\config.yaml` (on Windows only)
+3. **Launch GlazeWM** — it runs as a tray app
+
+### Hyprland → GlazeWM Binding Map
+
+| Action | Hyprland (CachyOS) | GlazeWM (Windows) |
+|--------|-------------------|-------------------|
+| Focus left/down/up | `Super+H/J/K` | `Win+H/J/K` |
+| Focus right | `Super+L` | **`Win+;`** (Win+L = Windows lock) |
+| Move window | `Super+Shift+H/J/K/L` | `Win+Shift+H/J/K/L` |
+| Switch workspace | `Super+1-9` | `Win+1-9` |
+| Move to workspace | `Super+Shift+1-9` | `Win+Shift+1-9` |
+| Close window | `Super+Q` | `Win+Q` |
+| Fullscreen | `Super+F` | `Win+F` |
+| Toggle floating | `Super+T` | `Win+T` |
+| Next/prev workspace | `Super+Tab/Shift+Tab` | `Win+Tab/Shift+Tab` |
+| Resize mode | `Super+[-/=]` | `Win+R` then H/J/K/L |
+| Toggle split | `Super+Ctrl+J` | `Win+Ctrl+J` |
+| Reload config | -- | `Win+Shift+R` |
+
+**Note:** Arrow key fallbacks are configured for all focus/move directions. `Win+L` is hardcoded by Windows to lock the screen and cannot be remapped, so focus-right uses `Win+;` (semicolon, right of L on QWERTY).
+
 ## What You Get
 - Fish shell with vim bindings, abbreviations, fzf, zoxide
 - Neovim (LazyVim) with full plugin suite and OSC 52 clipboard
@@ -528,6 +555,8 @@ All splits and tabs are managed by tmux inside WezTerm.
 - Git config with work email
 - Mise for runtime management (Node, Go, Bun, Java)
 - IdeaVim config (for JetBrains IDEs on Windows host)
+- GlazeWM tiling window manager with Hyprland-matching keybindings
+- PowerToys Win+C/V/X for terminal-safe copy/paste
 
 ## What Is Excluded (desktop-only)
 Controlled by `.chezmoiignore` WSL detection — these files exist in the repo but are never deployed on WSL:
