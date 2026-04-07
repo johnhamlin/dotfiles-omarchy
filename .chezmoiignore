@@ -4,6 +4,8 @@ packages-explicit.txt
 packages-aur.txt
 MIGRATION.md
 windows-terminal-settings.json
+wezterm.lua
+powertoys-keyboard-manager.json
 
 # HyDE-owned — do not manage
 .config/hypr/

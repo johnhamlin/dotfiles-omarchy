@@ -461,22 +461,50 @@ cat ~/.config/kitty/custom.conf | grep shell
    # https://developer.1password.com/docs/cli/get-started/#install
    ```
 
-## Windows Terminal Configuration
+## WezTerm Configuration
 
-Merge settings from `windows-terminal-settings.json` (in repo root) into Windows Terminal's `settings.json` (open with `Ctrl+Shift+,`):
+Copy `wezterm.lua` (in repo root) to `~/.wezterm.lua` on Windows (`%USERPROFILE%\.wezterm.lua`):
 
-- **Default profile**: Set to your Ubuntu WSL profile
-- **Auto-launch tmux**: Profile commandline runs `tmux new-session -A -s main`
-- **Font**: JetBrainsMono Nerd Font, size 9
-- **Unbind conflicting keys**: `Ctrl+B` (tmux prefix), `Ctrl+H/J/K/L` (smart-splits), `Alt+H/L` (tab switch), `Ctrl+Shift+C/V` (use `Ctrl/Shift+Insert` instead)
+```powershell
+copy \\wsl$\Ubuntu\home\john\.local\share\chezmoi\wezterm.lua %USERPROFILE%\.wezterm.lua
+```
 
-## Keybinding Cheat Sheet: Kitty vs tmux
+This configures:
+- **Default domain**: WSL:Ubuntu with auto-launch into tmux (`tmux new-session -A -s main`)
+- **Font**: JetBrainsMono Nerd Font, size 9, 14px padding
+- **Keybinding passthrough**: Unbinds `Ctrl+B` (tmux prefix), `Ctrl+H/J/K/L` (smart-splits), `Alt+H/L` (tab switch)
+- **Copy/paste**: `Ctrl+Insert` copy, `Shift+Insert` paste (receives PowerToys-remapped Win+C/V)
 
-All splits and tabs are managed by tmux inside Windows Terminal.
+## PowerToys Keyboard Manager (Win+C/V/X Copy/Paste)
 
-| Action | Kitty (CachyOS) | tmux (WSL) |
-|--------|-----------------|------------|
-| **Prefix key** | `Ctrl+A` | `Ctrl+B` |
+Replicates the CachyOS Hyprland `Super+C/V/X` muscle memory on Windows.
+
+1. **Install PowerToys** from the Microsoft Store or [GitHub releases](https://github.com/microsoft/PowerToys/releases)
+2. Open PowerToys Settings > **Keyboard Manager** > **Remap a shortcut**
+3. Add these remaps:
+
+   | Original | Remapped to | Purpose |
+   |----------|-------------|---------|
+   | `Win + C` | `Ctrl + Insert` | Copy (terminal-safe, no SIGINT) |
+   | `Win + V` | `Shift + Insert` | Paste (terminal-safe) |
+   | `Win + X` | `Ctrl + X` | Cut |
+   | `Win + Ctrl + V` | `Win + V` | Windows clipboard history (relocated) |
+
+   Or copy `powertoys-keyboard-manager.json` to `%LOCALAPPDATA%\Microsoft\PowerToys\Keyboard Manager\default.json` and restart PowerToys.
+
+**How it works**: PowerToys intercepts Win+C/V/X system-wide before Windows processes them, translates to Ctrl+Insert / Shift+Insert / Ctrl+X, then WezTerm handles those as copy/paste. This is the same flow as CachyOS where Hyprland's `sendshortcut` translates Super+C/V to Ctrl+Insert / Shift+Insert.
+
+## Keybinding Cheat Sheet: CachyOS vs WSL
+
+All splits and tabs are managed by tmux inside WezTerm.
+
+| Action | CachyOS (Hyprland + Kitty) | WSL (PowerToys + WezTerm + tmux) |
+|--------|---------------------------|----------------------------------|
+| **Copy** | `Super+C` | `Win+C` (via PowerToys) |
+| **Paste** | `Super+V` | `Win+V` (via PowerToys) |
+| **Cut** | `Super+X` | `Win+X` (via PowerToys) |
+| **Clipboard history** | `Super+Shift+V` | `Win+Ctrl+V` (relocated) |
+| **Prefix key** | `Ctrl+A` (kitty) | `Ctrl+B` (tmux) |
 | New tab | `Ctrl+A > c` | `Ctrl+B c` |
 | Rename tab | `Ctrl+A > ,` | `Ctrl+B r` |
 | Horizontal split | `Ctrl+A > s` | `Ctrl+B v` |
@@ -489,8 +517,8 @@ All splits and tabs are managed by tmux inside Windows Terminal.
 | Navigate splits | `Ctrl+H/J/K/L` | `Ctrl+H/J/K/L` (smart-splits) |
 | Swap pane | `Ctrl+A > Shift+H/J/K/L` | `Ctrl+B Shift+H/J/K/L` |
 | Cycle layout | `Ctrl+A > Space` | `Ctrl+B Space` |
-| Detach session | — | `Ctrl+B d` |
-| Reattach session | — | `tmux attach` |
+| Detach session | -- | `Ctrl+B d` |
+| Reattach session | -- | `tmux attach` |
 
 ## What You Get
 - Fish shell with vim bindings, abbreviations, fzf, zoxide
@@ -515,7 +543,9 @@ Controlled by `.chezmoiignore` WSL detection — these files exist in the repo b
 On WSL, `abbr.fish` is a chezmoi template. The `abbr-edit` function uses `chezmoi add` which would strip template markers. For editing abbreviations, use `chezmoi edit ~/.config/fish/conf.d/abbr.fish` instead.
 
 ### Clipboard
-Neovim uses OSC 52 for clipboard, which works in Windows Terminal. Copy/paste between WSL and Windows should work out of the box.
+- **Win+C / Win+V** for copy/paste everywhere (via PowerToys → Ctrl+Insert / Shift+Insert → WezTerm)
+- **Neovim** uses OSC 52 for clipboard, which works in WezTerm. Yanks in nvim go to the Windows clipboard.
+- **tmux** copy mode: `prefix [` to enter, `v` to select, `y` to yank (copies to system clipboard via `set -g set-clipboard on`)
 
 ### Tmux sessions persist across terminal closes
-Since Windows Terminal auto-attaches to an existing tmux session (`tmux new-session -A -s main`), closing and reopening the terminal reconnects to your running session.
+WezTerm auto-attaches to an existing tmux session (`tmux new-session -A -s main`), so closing and reopening the terminal reconnects to your running session.

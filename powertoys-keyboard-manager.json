@@ -1,0 +1,31 @@
+{
+  "$help": "Import into PowerToys Keyboard Manager (Settings > Keyboard Manager > Remap a shortcut). Or copy to %LOCALAPPDATA%\\Microsoft\\PowerToys\\Keyboard Manager\\default.json and restart PowerToys.",
+  "remapKeys": {
+    "inProcess": []
+  },
+  "remapShortcuts": {
+    "global": [
+      {
+        "originalKeys": "91;67",
+        "newRemapKeys": "17;45",
+        "$comment": "Win+C -> Ctrl+Insert (terminal-safe copy, matches Hyprland Super+C)"
+      },
+      {
+        "originalKeys": "91;86",
+        "newRemapKeys": "16;45",
+        "$comment": "Win+V -> Shift+Insert (terminal-safe paste, matches Hyprland Super+V)"
+      },
+      {
+        "originalKeys": "91;88",
+        "newRemapKeys": "17;88",
+        "$comment": "Win+X -> Ctrl+X (cut, matches Hyprland Super+X)"
+      },
+      {
+        "originalKeys": "91;17;86",
+        "newRemapKeys": "91;86",
+        "$comment": "Win+Ctrl+V -> Win+V (relocates Windows clipboard history)"
+      }
+    ],
+    "appSpecific": []
+  }
+}
