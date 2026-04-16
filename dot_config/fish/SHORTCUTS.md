@@ -25,7 +25,8 @@ Tips:
 |---|---|---|
 | **Ctrl+P** | History prefix search backward (type partial cmd, then Ctrl+P to cycle matches) | config.fish |
 | **Ctrl+N** | History prefix search forward | config.fish |
-| **Ctrl+.** | Accept next word of autosuggestion (requires kitty keybind) | config.fish |
+| **Ctrl+Y** | Accept full autosuggestion | config.fish |
+| **Ctrl+.** | Accept next WORD of autosuggestion (whitespace-delimited) | config.fish |
 | **Ctrl+S** | Toggle `sudo` prefix on current command | config.fish |
 
 ## 3. Fish Built-in Keybindings (insert mode)

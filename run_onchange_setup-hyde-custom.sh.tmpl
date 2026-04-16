@@ -12,6 +12,7 @@
 # {{ include "dot_config/hypr-custom/input.conf.tmpl" | sha256sum }}
 # {{ include "dot_config/hypr-custom/envs.conf.tmpl" | sha256sum }}
 # {{ include "dot_config/hypr-custom/autostart.conf" | sha256sum }}
+# {{ include "dot_config/hypr-custom/workspaces.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/windowrules/base.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/windowrules/apps.conf" | sha256sum }}
 # {{ include "dot_config/hypr-custom/bindings/tiling.conf" | sha256sum }}
@@ -32,6 +33,7 @@ fi
 cat > "$USERPREFS" << 'EOF'
 # Managed by chezmoi — edit files in ~/.config/hypr-custom/ instead
 source = ~/.config/hypr-custom/unbind.conf
+source = ~/.config/hypr-custom/workspaces.conf
 source = ~/.config/hypr-custom/appearance.conf
 source = ~/.config/hypr-custom/input.conf
 source = ~/.config/hypr-custom/envs.conf
