@@ -202,6 +202,12 @@ Full list: `abbr --show` or see `~/.config/fish/conf.d/abbr.fish`
 | `y` | Launch yazi file manager, cd to selected dir on exit |
 | `abbr-edit` | Edit abbreviations file, auto-sources + chezmoi adds |
 | `load-api-keys` | Load API keys from 1Password |
+| `wkt` | Attach grouped tmux client on work laptop WSL (multi-Kitty: shared windows, independent focus) |
+| `wkt <name>` | Plain ungrouped tmux session on work laptop |
+| `wkt -l` | List remote tmux sessions on work laptop |
+| `wkt -k <name>` | Kill a remote tmux session |
+| `wkt -h` | wkt usage reminder |
+| `wkz` | Same shape as `wkt` but for zellij (deprecated; WSL tmux is current primary) |
 
 ## 10. Notification (done plugin)
 

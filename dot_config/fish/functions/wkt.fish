@@ -27,6 +27,16 @@ function wkt --description 'SSH into BT work laptop, attach tmux (grouped client
     end
 
     switch $argv[1]
+        case '-h' '--help'
+            echo "wkt — attach tmux on the work laptop (WSL)"
+            echo
+            echo "  wkt           grouped client off shared 'base' session"
+            echo "                (multi-Kitty: same windows, independent focus)"
+            echo "  wkt <name>    plain ungrouped session (own windows + state)"
+            echo "  wkt -l        list remote tmux sessions"
+            echo "  wkt -k <name> kill a session"
+            echo "  wkt -h        this help"
+            return 0
         case '-l'
             command ssh work-ps "wsl -d Ubuntu -e tmux ls" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|wsl:\|networkingMode\|Error code"
         case '-k'
