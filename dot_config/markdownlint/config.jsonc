@@ -1,0 +1,10 @@
+{
+  // Global markdownlint config.
+  // MD013 = line-length. Disabled: John writes long, unwrapped prose lines in
+  // markdown and doesn't want hard-wrap diagnostics.
+  // Consumed by markdownlint-cli2 via --config, wired up in
+  // ~/.config/nvim/lua/plugins/markdownlint.lua (nvim-lint pipes over stdin, and
+  // in stdin mode markdownlint-cli2 only reads a config from the cwd, so it must
+  // be pointed here explicitly).
+  "MD013": false
+}
