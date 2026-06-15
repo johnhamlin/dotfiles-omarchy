@@ -1,0 +1,17 @@
+/*
+  Force real Segoe UI in teams-for-linux.  2026-06-15
+
+  Why: Chromium (Electron 41) maps the CSS `system-ui` keyword to this machine's
+  GTK *monospace* font (CaskaydiaCove Nerd Font Mono), and Teams' Fluent UI font
+  stacks include `system-ui`. Teams' own bundled "Segoe UI" @font-face also loads
+  in error state. Net effect: the whole UI rendered in a monospace Nerd Font.
+  Chromium's system-ui ignores fontconfig, so the only reliable fix is to force
+  the family by name here. "Segoe UI Variable Static Text" is installed via
+  ttf-segoe-ui-variable and is confirmed to render in this renderer.
+
+  Preserves: code/monospace blocks and icon-font elements.
+*/
+body,
+body *:not(pre):not(code):not([class*="onospace"]):not([class*="Icon"]):not([class*="icon"]):not([data-icon-name]):not([class*="codeblock"]) {
+  font-family: "Segoe UI Variable Static Text", "Segoe UI", "Noto Sans", sans-serif !important;
+}
