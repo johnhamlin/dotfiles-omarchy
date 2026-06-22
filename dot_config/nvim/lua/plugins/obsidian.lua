@@ -2,8 +2,8 @@ return {
   "obsidian-nvim/obsidian.nvim",
   version = "*",
   event = {
-    "BufReadPre " .. vim.fn.expand("~") .. "/Documents/notes/**.md",
-    "BufNewFile " .. vim.fn.expand("~") .. "/Documents/notes/**.md",
+    "BufReadPre " .. vim.fn.expand("~") .. "/Nextcloud/Obsidian/**.md",
+    "BufNewFile " .. vim.fn.expand("~") .. "/Nextcloud/Obsidian/**.md",
   },
   cmd = { "Obsidian" },
   dependencies = {
@@ -65,7 +65,7 @@ return {
     workspaces = {
       {
         name = "notes",
-        path = "~/Documents/notes",
+        path = "~/Nextcloud/Obsidian",
       },
     },
     daily_notes = {

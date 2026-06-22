@@ -79,7 +79,7 @@ AI: claudecode, copilot | Languages: typescript, angular, ember, go, rust, pytho
 
 ## External Dependencies
 
-- Obsidian vault: `~/Documents/notes` (shared with Obsidian app, templates in `templates/`)
+- Obsidian vault: `~/Nextcloud/Obsidian` (Nextcloud-synced, shared with Obsidian app, templates in `templates/`)
 - markdown_oxide LSP excluded from vault (obsidian.nvim owns it); see `nvim-lspconfig.lua`
 - LeetCode uses TypeScript by default
 - Conjure uses Chez Scheme for REPL

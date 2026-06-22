@@ -29,7 +29,7 @@ return {
         local orig_root = require("lspconfig.util").root_pattern(".marksman.toml", ".git")
         server_opts.root_dir = function(bufnr_or_fname)
           local fname = type(bufnr_or_fname) == "number" and vim.api.nvim_buf_get_name(bufnr_or_fname) or bufnr_or_fname
-          if fname:find(vim.fn.expand("~/Documents/notes"), 1, true) then
+          if fname:find(vim.fn.expand("~/Nextcloud/Obsidian"), 1, true) then
             return nil
           end
           return orig_root(fname)
