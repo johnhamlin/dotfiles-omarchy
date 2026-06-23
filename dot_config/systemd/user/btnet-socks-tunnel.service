@@ -1,0 +1,16 @@
+[Unit]
+Description=SOCKS5 tunnel: native Linux Chrome -> bt-lw1180 -> BTNet OpenVPN
+Documentation=file:///home/john/notes/winapps-setup-debugging.md
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh -N -T -o RequestTTY=no -o RemoteCommand=none -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -D 127.0.0.1:1080 work-tunnel
+Restart=always
+# Backoff per CLAUDE.md: a 10s retry against `ssh work` wedged the inner sshd
+# (2026-06-01 sshuttle incident). Start at 60s, back off toward 5min.
+RestartSec=60
+RestartSteps=4
+RestartMaxDelaySec=300
+
+[Install]
+WantedBy=default.target

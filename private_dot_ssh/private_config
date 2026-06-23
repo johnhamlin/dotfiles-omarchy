@@ -1,0 +1,131 @@
+Host gram
+  HostName 10.10.10.3
+  User john
+  IdentityFile ~/.ssh/id_ed25519_gram
+
+Host tp
+    HostName 10.10.10.11
+    User john
+    IdentityFile ~/.ssh/id_ed25519
+
+# === Work laptop SSH (BT-LW1180) ===========================================
+# Inbound to BT-LW1180 always hits sshjohn at the wire level — sshd cannot
+# authenticate AAD users (~/notes/work-laptop-ssh-aad.md explains why). The
+# `work*` aliases below chain through sshjohn into an inner sshd that runs
+# inside BT\john.hamlin's live RDP session, bound to localhost:2222. Full
+# design in ~/notes/work-laptop-ssh-jh-nested.md.
+
+# Default: drops into MSYS2 fish as BT\john.hamlin. The everyday alias.
+# The fish-launcher.cmd mirrors the WezTerm fast-launch pattern: sets just
+# MSYSTEM/CHERE_INVOKING/MSYS2_PATH_TYPE/HOME/PATH and execs fish.exe directly,
+# bypassing bash, msys2_shell.cmd, and /etc/profile. See ~/notes/fish-setup.md
+# for the WezTerm-side rationale and ~/notes/work-laptop-ssh-jh-nested.md for
+# how the env vars sshjohn used to need are no longer required here.
+Host work
+    HostName localhost
+    Port 2222
+    User john.hamlin
+    ProxyJump work-sshjohn-vscode
+    IdentityFile ~/.ssh/id_ed25519
+    RequestTTY yes
+    StrictHostKeyChecking accept-new
+    UserKnownHostsFile ~/.ssh/known_hosts.work-jh
+    RemoteCommand "C:\Users\john.hamlin\.ssh-inner\fish-launcher.cmd"
+    # No ControlMaster on inner hop — see work-ps for why.
+
+# Same target, drops into pwsh 7 (or whatever the inner sshd's ForceCommand
+# routes to when SSH_ORIGINAL_COMMAND is empty). Use for pwsh work, VS Code
+# Remote-SSH, scp, rsync — anything that wants a clean shell without a
+# RemoteCommand hijack.
+Host work-ps
+    HostName localhost
+    Port 2222
+    User john.hamlin
+    ProxyJump work-sshjohn-vscode
+    IdentityFile ~/.ssh/id_ed25519
+    RequestTTY auto
+    StrictHostKeyChecking accept-new
+    UserKnownHostsFile ~/.ssh/known_hosts.work-jh
+    # NO ControlMaster on the inner hop — Win32-OpenSSH's channel
+    # multiplexing returns stale output from previous slaves
+    # (tested 2026-05-28, every reused slave returned the prior command's
+    # stdout instead of its own). The outer hop's ControlMaster on
+    # work-sshjohn-vscode handles connection reuse fine on its own.
+
+# Legacy: SSH as sshjohn into the existing MSYS2-with-env-snapshot setup
+# (ssh-shell.cmd on the Windows side). Was the default; kept as an escape
+# hatch if the inner sshd is down. Files written here are owned by sshjohn,
+# not john.hamlin — use `work` instead for any normal use.
+Host work-sshjohn
+    HostName 10.10.10.12
+    User sshjohn
+    RequestTTY yes
+    RemoteCommand C:\Users\john.hamlin\local-admin\scripts\ssh-shell.cmd
+
+# Legacy: SSH as sshjohn with a clean shell (no RemoteCommand, no forced TTY).
+# Also the ProxyJump host for the `work` and `work-ps` aliases above. Only
+# use directly when fixing something broken with the inner sshd; everything
+# else is better served by `work` or `work-ps`.
+#
+# ControlMaster: keep the outer hop's TCP+SSH session warm for 10 minutes
+# after the last child exits. Massively cuts latency for repeated `wkt`,
+# `ssh work-ps cmd`, scp, etc — each subsequent connection reuses the
+# already-authenticated outer tunnel and only pays the inner-sshd auth cost.
+# Without this, each `ssh work` is two full kex + auth round trips.
+# 2026-06-15: repointed from the LAN IP 10.10.10.12 to the laptop's Tailscale
+# address. The LAN IPv4 path went dark (ping 100% loss, port 22 timeout) while
+# the SAME machine answered fine over Tailscale + IPv6 and ARP stayed REACHABLE
+# — i.e. the laptop's Windows Firewall is dropping inbound IPv4 on the LAN
+# (network profile flipped to Public on a Wi-Fi reconnect). Tailscale's direct
+# datapath rides the local IPv6 (~6ms), so no real latency cost. To revert to
+# LAN once the firewall profile is fixed, swap HostName back to 10.10.10.12.
+Host work-sshjohn-vscode
+    HostName 100.114.178.68
+    User sshjohn
+    RequestTTY no
+    RemoteCommand none
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPersist 10m
+    # Keepalives so a master left holding a dead TCP session (e.g. after a
+    # laptop reboot) self-terminates in ~90s instead of hanging forever and
+    # wedging every new connection that multiplexes onto it. See the stale
+    # ControlMaster writeup in ~/notes/btnet-socks-chrome.md (2026-06-23).
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+
+# --- Dedicated outer hop for the long-lived tunnels (SOCKS :1080, -L 443) ---
+# Identical to work-sshjohn-vscode BUT with no ControlMaster: the tunnels are
+# single long-lived connections that gain nothing from multiplexing, and
+# sharing the interactive master is what coupled them to its stale-socket
+# wedge after a reboot. With their own un-multiplexed connection + keepalives,
+# a stale *interactive* cm-sshjohn socket can never wedge the tunnels, and
+# each tunnel deterministically reconnects (systemd Restart=always) once the
+# laptop + RDP session are back. Used by btnet-socks-tunnel/btnet-tunnel units.
+Host work-sshjohn-tunnel
+    HostName 100.114.178.68
+    User sshjohn
+    RequestTTY no
+    RemoteCommand none
+    ControlMaster no
+    ControlPath none
+    ServerAliveInterval 30
+    ServerAliveCountMax 3
+
+Host work-tunnel
+    HostName localhost
+    Port 2222
+    User john.hamlin
+    ProxyJump work-sshjohn-tunnel
+    IdentityFile ~/.ssh/id_ed25519
+    RequestTTY no
+    StrictHostKeyChecking accept-new
+    UserKnownHostsFile ~/.ssh/known_hosts.work-jh
+    ControlMaster no
+    ControlPath none
+
+Host wakeabc
+    HostName 135.181.46.212
+    User john
+    IdentityFile ~/.ssh/wake-abc-tracker
+    IdentitiesOnly yes
