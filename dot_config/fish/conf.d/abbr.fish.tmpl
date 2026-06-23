@@ -103,3 +103,7 @@ abbr -a -- clc "claude -c"
 abbr -a -- pg 'pgcli -h localhost -p 5432 -U postgres'
 abbr -a -- pss 'ps aux | grep -i'
 abbr -a -- gg lazygit
+
+# Work laptop (RDP session must be up for ssh work / wkt to work)
+abbr -a -- btwin 'xfreerdp3 /f /u:john.hamlin /d:BT /v:10.10.10.12 /sec:tls +fonts +themes +clipboard -wallpaper -window-drag -menu-anims -aero /dynamic-resolution /floatbar /scale:140 /gfx:RFX /auto-reconnect /auto-reconnect-max-retries:20'
+abbr -a -- wk 'ssh work'
