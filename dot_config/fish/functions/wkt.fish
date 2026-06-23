@@ -19,11 +19,21 @@ function wkt --description 'SSH into BT work laptop, attach tmux (grouped client
     # johnhamlin` inside the distro, sessions persist indefinitely until
     # `wsl --shutdown` or reboot. See ~/notes/work-laptop-wsl-tmux-setup.md.
 
+    # IS_TMUX_BEFORE / IS_TMUX_AFTER below: tell the local kitty window we're
+    # entering a tmux session, so its ctrl+hjkl bindings (which normally
+    # navigate kitty windows) yield to tmux. Matched by
+    # `--when-focus-on var:IS_TMUX` in ~/.config/kitty/custom.conf. Doing this
+    # *locally* (rather than from WSL fish via DCS pass-through) keeps the
+    # signal out of the ssh chain entirely.
+
     if test (count $argv) -eq 0
         # Grouped-client pattern via remote helper (avoids escape soup of
         # passing the multi-tmux-command pipeline through ssh→pwsh→wsl→bash).
+        printf '\e]1337;SetUserVar=IS_TMUX=MQo\a'
         command ssh -t work-ps "wsl -d Ubuntu -e /home/johnhamlin/.local/bin/wkt-attach.sh"
-        return
+        set -l rc $status
+        printf '\e]1337;SetUserVar=IS_TMUX\a'
+        return $rc
     end
 
     switch $argv[1]
@@ -47,6 +57,10 @@ function wkt --description 'SSH into BT work laptop, attach tmux (grouped client
             command ssh work-ps "wsl -d Ubuntu -e tmux kill-session -t $argv[2]" 2>&1 | grep -v "post-quantum\|store now\|openssh.com\|wsl:\|networkingMode\|Error code"
         case '*'
             # Named, ungrouped session — plain attach-or-create.
+            printf '\e]1337;SetUserVar=IS_TMUX=MQo\a'
             command ssh -t work-ps "wsl -d Ubuntu -e tmux new-session -A -s $argv[1]"
+            set -l rc $status
+            printf '\e]1337;SetUserVar=IS_TMUX\a'
+            return $rc
     end
 end
