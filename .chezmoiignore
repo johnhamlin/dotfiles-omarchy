@@ -7,8 +7,10 @@ windows-terminal-settings.json
 wezterm.lua
 powertoys-keyboard-manager.json
 
-# HyDE-owned — do not manage
-.config/hypr/
+# HyDE-owned — do not manage (hypridle.conf and hyde.conf excepted: no HyDE base template)
+.config/hypr/*
+!.config/hypr/hypridle.conf
+!.config/hypr/hyde.conf
 
 {{ if eq .chezmoi.os "windows" }}
 # Linux-only

@@ -4,16 +4,21 @@ bindd = SUPER CTRL, E, Emoji picker, exec, hyde-shell emoji-picker
 bindd = SUPER CTRL, V, Clipboard manager, exec, hyde-shell cliphist -c
 
 # Copy / Paste
-bindd = SUPER, C, Universal copy, sendshortcut, CTRL, Insert,
-bindd = SUPER, V, Universal paste, sendshortcut, SHIFT, Insert,
-bindd = SUPER, X, Universal cut, sendshortcut, CTRL, X,
+# Hyprland 0.55 switched sendshortcut's parser to CVarList2, which strips
+# trailing empty elements — so `..., CTRL, X,` now resolves to 2 args and
+# fails with "invalid args" silently (no configerror). Workaround: pass the
+# special `activewindow` token as the 3rd (window) arg.
+bindd = SUPER, C, Universal copy, sendshortcut, CTRL, Insert, activewindow
+bindd = SUPER, V, Universal paste, sendshortcut, SHIFT, Insert, activewindow
+bindd = SUPER, X, Universal cut, sendshortcut, CTRL, X, activewindow
 
 # Power menu
 bindd = SUPER, ESCAPE, Power menu, exec, hyde-shell logoutlaunch
-bindld = , XF86PowerOff, Lock screen, exec, lock-screen
+bindld = , XF86PowerOff, Lock screen, exec, loginctl lock-session
 
 # Screenshots
 bindd = , PRINT, Screenshot, exec, hyprshot -m region
+bindd = SUPER SHIFT, PRINT, Screenshot to work WSL, exec, /home/john/.local/bin/shot2work
 bindd = SUPER, PRINT, Color picker, exec, pkill hyprpicker || hyprpicker -a
 
 # Waybar — delegate to HyDE's hyde-shell if available
@@ -54,3 +59,18 @@ bindd = , XF86Calculator, Calculator, exec, gnome-calculator
 # Hardware toggles
 bindd = SUPER SHIFT, I, Toggle internal keyboard, exec, toggle-internal-keyboard
 {{ end }}
+
+# ─── Passthrough submap ──────────────────────────────────────────────
+# Disables all Hyprland keybinds so keypresses flow to the focused
+# window. Use for xfreerdp3 / VMs / anything that wants full keyboard
+# capture. Toggle with SUPER+F12.
+#
+# Stuck? From a TTY or SSH:  hyprctl dispatch submap reset
+#
+# Must be the last thing in the last sourced bindings file — any
+# `bind = ...` that appears after `submap = passthrough` would be
+# swallowed into the submap instead of the global map.
+bind = SUPER, F12, submap, passthrough
+submap = passthrough
+bind = SUPER, F12, submap, reset
+submap = reset
