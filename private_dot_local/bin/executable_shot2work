@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# shot2work — capture a region screenshot (or push an existing image) to the
+# work laptop's WSL inbox, where Claude Code running in WSL can read it by path.
+# The resulting WSL path is copied to the clipboard and shown in a notification.
+#
+# Usage:
+#   shot2work          select a region, capture, and push it
+#   shot2work --last   push the most recent existing screenshot
+#   shot2work FILE     push a specific image file
+#
+# How it works: pipes the image as base64 over the `ssh work-ps` chain into the
+# WSL receiver ~/.local/bin/inbox-recv, which writes it to /home/johnhamlin/inbox
+# and echoes the absolute WSL path back. All remote logic lives in the receiver
+# so nothing with a `$` has to survive the ssh -> pwsh -> wsl -> bash quoting.
+# Background: ~/notes/work-laptop-shared-storage.md
+set -euo pipefail
+
+shotdir="$HOME/Pictures/Screenshots"
+
+case "${1:-}" in
+    -l|--last)
+        file=$(ls -t "$shotdir"/*.png "$HOME/Pictures"/*.png 2>/dev/null | head -n1)
+        [[ -n ${file:-} ]] || { notify-send -u critical "shot2work" "No screenshot found"; exit 1; }
+        ;;
+    -h|--help)
+        sed -n '2,12p' "$0"; exit 0
+        ;;
+    "")
+        mkdir -p "$shotdir"
+        file="$shotdir/$(date +%y%m%d_%Hh%Mm%Ss)_screenshot.png"
+        geom=$(slurp) || exit 1          # user cancelled the region select
+        grim -g "$geom" "$file"
+        ;;
+    *)
+        file="$1"
+        [[ -f $file ]] || { notify-send -u critical "shot2work" "No such file: $file"; exit 1; }
+        ;;
+esac
+
+dest=$(base64 -w0 "$file" \
+    | ssh -o ConnectTimeout=10 work-ps 'wsl -d Ubuntu -e bash -lc "~/.local/bin/inbox-recv"' \
+    | tr -d '\r' | tail -n1)
+
+if [[ -n ${dest:-} ]]; then
+    printf '%s' "$dest" | wl-copy
+    notify-send "Screenshot → work WSL" "$dest
+(path copied to clipboard)"
+    echo "$dest"
+else
+    notify-send -u critical "shot2work failed" "Could not reach the work laptop's WSL"
+    exit 1
+fi

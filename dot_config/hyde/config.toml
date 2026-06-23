@@ -5,3 +5,6 @@
 
 [hyprland-start]
 battery_notify = ""  # No battery on desktop
+
+[weather]
+show_location = false  # Strip "| City, Country" from waybar text (tooltip still shows it)
