@@ -1,4 +1,0 @@
-[main]
-leftshift = overload(shift, right)
-ejectcd = playpause
-
