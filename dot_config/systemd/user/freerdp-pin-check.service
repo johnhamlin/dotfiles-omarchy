@@ -1,0 +1,7 @@
+[Unit]
+Description=Nag if a freerdp newer than the pinned clipboard-leak build is available
+Documentation=file:///home/john/notes/btnet-rdp-clipboard-leak-freeze.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/freerdp-pin-check

@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly check for a freerdp release past the pinned clipboard-leak build
+
+[Timer]
+OnCalendar=Mon 10:00
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

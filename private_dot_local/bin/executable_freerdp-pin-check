@@ -1,0 +1,26 @@
+#!/bin/sh
+# Nag when a freerdp NEWER than the known-bad clipboard-leak version lands in the repo,
+# so the IgnorePkg pin (set 2026-07-02) can be re-tested and lifted.
+# Root cause + context: ~/notes/btnet-rdp-clipboard-leak-freeze.md  /  FreeRDP#11847
+#
+# Fires only on a genuinely new release (> KNOWN_BAD), NOT on the currently-pinned gap,
+# so it stays silent until there's actually something worth testing.
+
+KNOWN_BAD="2:3.27.1-1.1"   # last version confirmed to leak on CB_RESPONSE_FAIL
+
+# Repo version from the last-synced db (no root; refreshed whenever you -Syu).
+# NB: parse by whitespace, not ':' — the version carries an epoch ("2:3.27.1-1.1")
+# whose colon would otherwise truncate it to just the epoch.
+repo_ver=$(pacman -Si freerdp 2>/dev/null | awk '/^Version/{print $3; exit}')
+[ -z "$repo_ver" ] && exit 0
+
+# vercmp > 0  =>  repo has something newer than the known-bad build
+if [ "$(vercmp "$repo_ver" "$KNOWN_BAD")" -gt 0 ]; then
+    notify-send -u critical -a freerdp-pin-check \
+        "FreeRDP $repo_ver is out (pinned at 3.26.0)" \
+        "Newer than the known-bad $KNOWN_BAD clipboard-leak build. Test it, and if the CB_RESPONSE_FAIL storm is gone, unpin:
+  • remove 'IgnorePkg = freerdp' from /etc/pacman.conf
+  • sudo pacman -Syu freerdp
+  • verify:  journalctl --user -b | grep -c CB_RESPONSE_FAIL   (want ~0)
+See ~/notes/btnet-rdp-clipboard-leak-freeze.md"
+fi
