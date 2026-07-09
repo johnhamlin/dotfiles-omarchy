@@ -10,6 +10,12 @@
 # monospace. gsettings is the source Chromium reads. Inter is a TrueType-
 # flavoured font Chromium loads fine.
 #
-# Full diagnosis: ~/notes/fontconfig-2.18-segoe-adwaita-2026-06-11.md
+# FALLBACK ONLY (2026-07-09): this script is NOT durable by itself — HyDE
+# stamps font-name into dconf on every theme/wallbash apply and reverted it to
+# Cantarell on 2026-06-25 (run_onchange only re-runs when this file changes).
+# The real fix is `[hyprland] font = "Inter"` in dot_config/hyde/config.toml,
+# which makes HyDE itself write Inter.
+#
+# Full diagnosis: ~/notes/font-breakage-2026-06-11.md
 set -eu
 gsettings set org.gnome.desktop.interface font-name 'Inter 10'

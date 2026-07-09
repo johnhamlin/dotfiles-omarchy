@@ -6,5 +6,15 @@
 [hyprland-start]
 battery_notify = ""  # No battery on desktop
 
+[hyprland]
+# UI font MUST be Inter, not HyDE's default Cantarell: Chromium/Skia can't load
+# the Cantarell CFF2 variable OTF, so CSS `system-ui` falls back to the GTK
+# monospace font in every Chromium/Electron app. HyDE's color/dconf.sh stamps
+# this value into gsettings font-name on every theme/wallbash apply — without
+# this override it reverts to Cantarell (that's what happened 2026-06-25).
+# Full story: ~/notes/font-breakage-2026-06-11.md
+font = "Inter"
+font_size = 10
+
 [weather]
 show_location = false  # Strip "| City, Country" from waybar text (tooltip still shows it)
