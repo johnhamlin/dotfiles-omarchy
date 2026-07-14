@@ -7,11 +7,10 @@ windows-terminal-settings.json
 wezterm.lua
 powertoys-keyboard-manager.json
 
-# HyDE-owned — do not manage (hypridle.conf and hyde.conf excepted: no HyDE base template)
-.config/hypr/*
-!.config/hypr/hypridle.conf
-!.config/hypr/hyde.conf
-!.config/hypr/monitors.conf
+# Omarchy owns nothing in .config/hypr — chezmoi manages these:
+# hyprland.conf, monitors.conf, hypridle.conf (all real files in source).
+# HyDE-era leftovers in the deployed dir (userprefs.conf, keybindings.conf,
+# windowrules.conf, nvidia.conf) are unmanaged and removed in demolition.
 
 {{ if eq .chezmoi.os "windows" }}
 # Linux-only
@@ -35,7 +34,6 @@ powertoys-keyboard-manager.json
 .config/alacritty/
 .config/ghostty/
 .config/vivaldi-stable.conf
-keyd/
 .local/bin/
 .local/share/applications/
 {{ end }}
@@ -43,5 +41,4 @@ keyd/
 {{ if ne .formFactor "laptop" }}
 .local/bin/power-mode
 .local/bin/power-brightness
-keyd/internal.conf
 {{ end }}
