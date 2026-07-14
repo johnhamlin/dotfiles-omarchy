@@ -1,13 +1,13 @@
 # OSD on the currently focused monitor
 $osdclient = swayosd-client --monitor "$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')"
 
-# Volume — override ML4W's wpctl with swayosd for on-screen display
+# Volume — swayosd for on-screen display
 bindeld = ,XF86AudioRaiseVolume, Volume up, exec, $osdclient --output-volume raise
 bindeld = ,XF86AudioLowerVolume, Volume down, exec, $osdclient --output-volume lower
 bindeld = ,XF86AudioMute, Mute, exec, $osdclient --output-volume mute-toggle
 bindeld = ,XF86AudioMicMute, Mute microphone, exec, $osdclient --input-volume mute-toggle
 
-# Display brightness — override ML4W's brightnessctl with swayosd
+# Display brightness — swayosd
 bindeld = ,XF86MonBrightnessUp, Brightness up, exec, $osdclient --brightness raise
 bindeld = ,XF86MonBrightnessDown, Brightness down, exec, $osdclient --brightness lower
 

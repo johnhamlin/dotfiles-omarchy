@@ -43,10 +43,10 @@ bindd = SUPER CTRL, N, Toggle nightlight, exec, omarchy-toggle-nightlight
 bindd = SUPER CTRL, G, Toggle game mode, exec, gaming-mode
 
 # Control panels
-bindd = SUPER CTRL, A, Audio controls, exec, uwsm-app -- pavucontrol
-bindd = SUPER CTRL, B, Bluetooth controls, exec, uwsm-app -- blueman-manager
-bindd = SUPER CTRL, W, Wifi controls, exec, uwsm-app -- nm-connection-editor
-bindd = SUPER CTRL, T, Activity, exec, uwsm-app -- xdg-terminal-exec -e btop
+bindd = SUPER CTRL, A, Audio controls, exec, omarchy-launch-audio
+bindd = SUPER CTRL, B, Bluetooth controls, exec, omarchy-launch-bluetooth
+bindd = SUPER CTRL, W, Wifi controls, exec, omarchy-launch-wifi
+bindd = SUPER CTRL, T, Activity, exec, omarchy-launch-tui btop
 
 # Dictation
 bindd = SUPER CTRL, X, Toggle dictation, exec, voxtype record toggle
