@@ -2,6 +2,9 @@
 export OMARCHY_PATH=$HOME/.local/share/omarchy
 export PATH=$OMARCHY_PATH/bin:$HOME/.local/bin:$PATH
 
+# Mise-managed runtimes for GUI apps / user services (shims only)
+command -v mise >/dev/null 2>&1 && eval "$(mise activate bash --shims)"
+
 # Omarchy user tweaks file (omarchy-default-editor et al. sed this)
 [ -r "$HOME/.config/uwsm/default" ] && . "$HOME/.config/uwsm/default"
 

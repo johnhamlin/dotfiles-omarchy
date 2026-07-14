@@ -57,7 +57,7 @@ bindd = SUPER CTRL ALT, Z, Reset zoom, exec, hyprctl keyword cursor:zoom_factor 
 
 # Information
 bindd = SUPER CTRL, K, Search keybindings, exec, omarchy-menu-keybindings
-bindd = SUPER CTRL ALT, T, Show time, exec, notify-send "    $(date +\"%A %H:%M  —  %d %B W%V %Y\")"
+bindd = SUPER CTRL ALT, T, Show time, exec, notify-send "    $(date +"%A %H:%M  —  %d %B W%V %Y")"
 bindd = , XF86Calculator, Calculator, exec, gnome-calculator
 
 {{ if eq .formFactor "laptop" }}
