@@ -1,0 +1,10 @@
+# Managed by chezmoi. Bash stays the login shell (Omarchy requirement);
+# interactive top-level shells hand off to fish (omarchy-fish pattern).
+# If an Omarchy migration rewrites ~/.bashrc, chezmoi apply restores this.
+if [[ $- == *i* && $SHLVL -eq 1 && -x /usr/bin/fish ]] \
+   && [[ "$(ps -o comm= -p $PPID 2>/dev/null)" != "fish" ]]; then
+  exec /usr/bin/fish
+fi
+
+# Non-fish path (nested bash, scripts sourcing bashrc): Omarchy's bash setup
+[[ -f ~/.local/share/omarchy/default/bash/rc ]] && source ~/.local/share/omarchy/default/bash/rc

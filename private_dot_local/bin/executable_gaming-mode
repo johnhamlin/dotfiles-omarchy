@@ -1,73 +1,24 @@
-#!/bin/bash
-
-# gaming-mode — Toggle gaming mode: disable secondary monitors, enable hardware
-# cursors (safe with single monitor), activate HyDE gaming workflow, ensure
-# performance power profile.
-#
-# On machines with a single monitor (e.g., laptop), only toggles HyDE gaming
-# workflow and power profile.
-
+#!/usr/bin/env bash
+# Toggle gaming mode: single monitor, hardware cursors, no eye candy.
+# Rewritten for Omarchy (was HyDE-coupled via gaming.conf + gamemode.lck).
 set -euo pipefail
+LCK="${XDG_RUNTIME_DIR:-/tmp}/gaming-mode.lck"
 
-LOCK_FILE="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hyde/gaming-mode.lck"
-GAMING_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/workflows/gaming.conf"
-
-notify() {
-    notify-send -a "Gaming Mode" -i input-gaming "$@" 2>/dev/null || true
-}
-
-get_secondary_monitors() {
-    hyprctl monitors -j | jq -r '.[] | select(.focused == false) | .name'
-}
-
-gaming_on() {
-    mkdir -p "$(dirname "$LOCK_FILE")"
-    local secondaries
-    secondaries=$(get_secondary_monitors)
-
-    # Disable secondary monitors
-    if [[ -n "$secondaries" ]]; then
-        while IFS= read -r mon; do
-            hyprctl keyword monitor "$mon,disable" -q
-        done <<< "$secondaries"
-        # Safe to use hardware cursors with single landscape monitor
-        hyprctl keyword cursor:no_hardware_cursors false -q
-    fi
-
-    # Activate HyDE gaming workflow (disables animations, blur, shadows)
-    if [[ -f "$GAMING_CONF" ]]; then
-        hyprctl keyword source "$GAMING_CONF" -q
-    fi
-
-    # Ensure performance power profile
-    if command -v powerprofilesctl &>/dev/null; then
-        powerprofilesctl set performance
-    fi
-
-    # Set HyDE's lock file too so HyDE-aware tools know gaming mode is active
-    touch "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hyde/gamemode.lck"
-    touch "$LOCK_FILE"
-    notify "Gaming mode ON" "Secondary monitors disabled, hardware cursors enabled"
-}
-
-gaming_off() {
-    # Reload restores monitors from monitors.conf + animations/blur/shadows
-    hyprctl reload -q
-
-    # Re-disable hardware cursors for multi-monitor safety
-    local monitor_count
-    monitor_count=$(hyprctl monitors -j | jq 'length')
-    if [[ "$monitor_count" -gt 1 ]]; then
-        hyprctl keyword cursor:no_hardware_cursors true -q
-    fi
-
-    rm -f "$LOCK_FILE"
-    rm -f "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hyde/gamemode.lck"
-    notify "Gaming mode OFF" "Monitors restored, software cursors enabled"
-}
-
-if [[ -f "$LOCK_FILE" ]]; then
-    gaming_off
+if [[ -f $LCK ]]; then
+  rm -f "$LCK"
+  # Restore everything from config (monitors, animations, blur, shadows, cursors)
+  hyprctl reload
+  # no_hardware_cursors=true is restored by input.conf on reload (multi-monitor NVIDIA fix)
+  notify-send "Gaming mode OFF" "Monitors + effects restored"
 else
-    gaming_on
+  touch "$LCK"
+  hyprctl keyword monitor "DP-2, disable"
+  hyprctl keyword monitor "DP-3, disable"
+  # Single monitor: hardware cursors are safe (the NVIDIA bug is at rotated boundaries)
+  hyprctl keyword cursor:no_hardware_cursors false
+  hyprctl keyword animations:enabled 0
+  hyprctl keyword decoration:blur:enabled 0
+  hyprctl keyword decoration:shadow:enabled 0
+  powerprofilesctl set performance || true
+  notify-send "Gaming mode ON" "DP-2/DP-3 off, HW cursors, effects off"
 fi
