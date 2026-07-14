@@ -1,0 +1,11 @@
+# Managed by chezmoi. Sourced by uwsm at session start (POSIX sh).
+export OMARCHY_PATH=$HOME/.local/share/omarchy
+export PATH=$OMARCHY_PATH/bin:$HOME/.local/bin:$PATH
+
+# Omarchy user tweaks file (omarchy-default-editor et al. sed this)
+[ -r "$HOME/.config/uwsm/default" ] && . "$HOME/.config/uwsm/default"
+
+# Optional local drop-ins
+for f in "${XDG_CONFIG_HOME:-$HOME/.config}"/uwsm/env.d/*.sh; do
+  [ -r "$f" ] && . "$f"
+done

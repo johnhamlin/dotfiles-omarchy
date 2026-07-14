@@ -2,9 +2,6 @@
 # HyDE sets: XDG_*, QT_QPA_PLATFORM, GDK_BACKEND, XCURSOR_SIZE, HYPRCURSOR_SIZE,
 #            ELECTRON_OZONE_PLATFORM_HINT, cursor size, etc.
 
-# XCompose
-env = XCOMPOSEFILE,~/.XCompose
-
 {{ if eq .gpu "nvidia" -}}
 # NVIDIA — only vars not already set by HyDE's nvidia.conf
 # HyDE sets: LIBVA_DRIVER_NAME, __GLX_VENDOR_LIBRARY_NAME, GBM_BACKEND
@@ -18,4 +15,9 @@ env = VDPAU_DRIVER,nvidia
 env = __GL_MaxFramesAllowed,1
 env = __GL_GSYNC_ALLOWED,1
 env = MOZ_DISABLE_RDD_SANDBOX,1  # Required for Firefox NVIDIA VA-API hw decode
+# New: previously supplied by HyDE (uwsm 01-gpu.sh / hypr nvidia.conf);
+# Omarchy 3.8.3's nvidia env delivery is dead code (writes an unsourced file).
+env = LIBVA_DRIVER_NAME,nvidia
+env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+env = __GL_VRR_ALLOWED,1
 {{ end -}}
