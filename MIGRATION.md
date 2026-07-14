@@ -1,10 +1,18 @@
-# New Machine Setup Checklist (HyDE)
+# New Machine Setup Checklist (Omarchy hybrid)
+
+This machine runs **CachyOS + a pinned Omarchy 3.8.3 hybrid**, NOT stock Omarchy
+and NOT HyDE. Omarchy is a read-only *parts catalog* (a pinned git clone) that
+chezmoi-managed configs source; Omarchy's own installer is never run. Full design
++ rationale: `~/notes/omarchy-migration-2026-07.md`. Machine branch = `omarchy`.
+
+> The desktop was migrated HyDE → Omarchy on 2026-07-14. This checklist targets a
+> **fresh CachyOS** machine (or reprovision). The old HyDE checklist is preserved
+> on the `hyde` branch of this repo if you ever need it.
 
 ## Prerequisites
-- [ ] CachyOS installed
-- [ ] HyDE installed via `~/HyDE/Scripts/install.sh`
+- [ ] CachyOS installed (base kept as-is: linux-cachyos kernel, nvidia-open, Limine+sbctl+snapper, ufw, docker, NetworkManager WiFi pinning)
 - [ ] SSH keys available (copy `~/.ssh/` from backup or re-export from 1Password)
-- [ ] HyDE initial setup wizard completed (theme, wallpaper, waybar style)
+- [ ] `iommu=pt` on `/proc/cmdline` (WiFi collapses without it) — never `iommu=soft`
 
 ## Core Setup
 
@@ -13,292 +21,146 @@
    sudo pacman -S chezmoi git
    ```
 
-2. **Initialize dotfiles**
+2. **Initialize dotfiles on the `omarchy` branch**
    ```bash
-   chezmoi init johnhamlin/dotfiles-omarchy --branch hyde
+   chezmoi init johnhamlin/dotfiles-omarchy --branch omarchy
    ```
 
 3. **Configure machine identity** — edit `~/.config/chezmoi/chezmoi.toml`:
    ```toml
    [data]
-       machine = "desktop-name"      # e.g. "thinkpad-p1-gen4", "desktop-amd"
+       machine = "desktop-amd"       # e.g. "desktop-amd", "thinkpad-p1-gen4"
        formFactor = "desktop"        # "desktop" or "laptop"
-       gpu = "amd"                   # "nvidia", "amd", or "intel"
+       gpu = "nvidia"                # "nvidia", "amd", or "intel"
 
    [edit]
        command = "nvim"
    ```
 
-4. **Preview changes before applying**
+4. **Clone the pinned Omarchy parts catalog** (chezmoi configs source it; do NOT
+   run its installer):
    ```bash
-   chezmoi diff                     # review what will change
-   chezmoi managed | head -30       # verify managed file list looks right
+   git clone --branch v3.8.3 --depth 1 https://github.com/basecamp/omarchy.git ~/.local/share/omarchy
+   cat ~/.local/share/omarchy/version   # -> 3.8.3 (detached HEAD at the tag is intended)
    ```
+   `omarchy-update` / `omarchy-migrate` / `install.sh` are **forbidden** — see the
+   update policy in `~/notes/omarchy-migration-2026-07.md`.
 
-5. **Apply dotfiles**
+5. **Append the `[omarchy]` pacman repo LAST** (so CachyOS/chaotic win every name
+   collision), then install the package set:
    ```bash
-   chezmoi apply
-   ```
-   This will:
-   - Deploy `~/.config/hypr-custom/` with all Hyprland overrides
-   - Write source lines into HyDE's `~/.config/hypr/userprefs.conf` (bridge script)
-   - Deploy terminal configs (kitty custom.conf, alacritty, ghostty)
-   - Deploy helper scripts to `~/.local/bin/`
-   - Deploy nvim, fish, git, tmux, starship configs
-
-6. **Reload Hyprland to apply config**
-   ```bash
-   hyprctl reload
-   ```
-
-## Package Management
-
-7. **Remove Omarchy packages** (if migrating from Omarchy):
-   ```bash
-   # These are no longer needed — HyDE or our config replaces them
-   sudo pacman -Rns omarchy-fish omarchy-keyring omarchy-nvim omarchy-walker mako swaybg 2>/dev/null
-   ```
-
-8. **Install additional packages** our config needs (HyDE may already have some):
-   ```bash
-   # Required by our keybindings and scripts
+   printf '\n[omarchy]\nSigLevel = Optional TrustAll\nServer = https://pkgs.omarchy.org/stable/$arch\n' | sudo tee -a /etc/pacman.conf
+   sudo pacman -Sy
+   sudo pacman -S --needed omarchy-keyring
    sudo pacman -S --needed \
-     swayosd \
-     fcitx5 fcitx5-gtk fcitx5-qt \
-     hyprsunset \
-     hyprshot \
-     hyprpicker \
-     cliphist \
-     uwsm \
-     jq \
-     brightnessctl \
-     gum \
-     nautilus \
-     pavucontrol \
-     blueman \
-     nm-connection-editor \
-     btop \
-     lazydocker \
-     tmux \
-     starship
-
-   # AUR packages (install with paru/yay)
-   # paru -S --needed 1password 1password-cli
+     omarchy-walker mako swaybg polkit-gnome hyprland-preview-share-picker \
+     xdg-terminal-exec gnome-keyring gnome-themes-extra yaru-icon-theme \
+     woff2-font-awesome ttf-jetbrains-mono-nerd inter-font omarchy-fish \
+     wiremix impala bluetui gnome-calculator libqalculate \
+     nautilus-python sushi gvfs-nfs gvfs-smb tesseract tesseract-data-eng \
+     evince imv mpv python-terminaltexteffects yay uwsm kitty
+   # AUR/full-experience extras (paru/yay), review first:
+   #   spotify obs-studio cliamp obsidian typora gnome-disk-utility bolt tobi-try
+   #   dust whois socat xmlstarlet aether
    ```
 
-9. **Install full package list** (optional — review first):
+6. **Preview and apply dotfiles**
    ```bash
-   # These lists may contain Omarchy-specific packages — review before installing
-   cat ~/.local/share/chezmoi/packages-explicit.txt
-   cat ~/.local/share/chezmoi/packages-aur.txt
+   chezmoi diff                     # review; hypr/, hypr-custom/, uwsm, kitty, fontconfig, fish, bashrc
+   chezmoi apply ~/.config/hypr ~/.config/hypr-custom ~/.config/uwsm ~/.config/kitty \
+                 ~/.config/fontconfig ~/.config/fish ~/.config/xdg-terminals.list \
+                 ~/.bashrc ~/.local/bin
+   ```
+   This deploys `~/.config/hypr/hyprland.conf` (the top-level source chain that
+   sources Omarchy defaults from `~/.local/share/omarchy` + John's `hypr-custom/`
+   binds), `hypridle.conf`, `monitors.conf`, our `uwsm/env` (OMARCHY_PATH + mise
+   shims), `kitty.conf`, `fontconfig/fonts.conf` (Inter), fish/bashrc, helper
+   scripts.
+
+7. **Walker/elephant wiring + swayosd** (user-level scripts from the clone — inspect first):
+   ```bash
+   O=~/.local/share/omarchy
+   bash $O/install/config/walker-elephant.sh      # autostart + elephant menu symlinks (verify: only $HOME cp/ln/mkdir)
+   systemctl --user daemon-reload
+   systemctl --user enable --now swayosd-server.service
    ```
 
-10. **Install runtimes**
+8. **Theme init** (populates `~/.config/omarchy/current/theme/*`, which hyprland.conf sources):
+   ```bash
+   export OMARCHY_PATH=~/.local/share/omarchy PATH=~/.local/share/omarchy/bin:$PATH
+   mkdir -p ~/.local/state/omarchy/toggles/hypr
+   cp $OMARCHY_PATH/default/hypr/toggles/flags.conf ~/.local/state/omarchy/toggles/hypr/
+   omarchy-theme-set tokyo-night
+   test -f ~/.config/omarchy/current/theme/hyprland.conf && echo THEME-OK
+   ```
+
+9. **gsettings (theme + durable Inter font)**:
+   ```bash
+   gsettings set org.gnome.desktop.interface gtk-theme "Adwaita-dark"
+   gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
+   gsettings set org.gnome.desktop.interface icon-theme "Yaru-blue"
+   gsettings set org.gnome.desktop.interface font-name 'Inter 10'
+   ```
+   Omarchy never writes `font-name`, so this is durable (unlike under HyDE). Do
+   NOT set Cantarell — Chromium can't load its CFF2 VF. See `~/notes/font-breakage-2026-06-11.md`.
+
+## Login (SDDM autologin) — SUDO
+
+10. **Run Omarchy's SDDM + keyring scripts** (inspect first; they configure the
+    Wayland greeter, autologin, session desktop, PAM keyring strip):
     ```bash
-    mise install
+    O=~/.local/share/omarchy
+    export OMARCHY_PATH=$O PATH=$O/bin:$PATH
+    bash $O/install/login/sddm.sh
+    bash $O/install/login/default-keyring.sh
+    # Add monitor rotation to the greeter (use /usr/bin/grep to dodge the RTK tee-pipe bug):
+    /usr/bin/grep '^monitor' ~/.config/hypr/monitors.conf | sudo tee -a /usr/share/sddm/hyprland.conf
     ```
 
-## Post-Apply Configuration
-
-11. **Verify Hyprland config**
+11. **Login shell → bash** (Omarchy requirement; `~/.bashrc` exec-hands-off to fish):
     ```bash
-    hyprctl reload                   # should apply with no errors
-    # Test these keybindings:
-    #   Super+H/J/K/L    — vim focus movement
-    #   Super+Space      — rofi app launcher
-    #   Super+Return     — terminal
-    #   Super+Shift+B    — browser
-    #   Super+Q          — close window
-    #   Super+S          — scratchpad
-    #   Super+Tab        — next workspace
-    #   Super+Comma      — close notification (dunst)
-    #   Volume keys      — should show swayosd on-screen display
+    chsh -s /bin/bash
     ```
 
-12. **Configure monitors** — HyDE handles this via its settings tools, or manually:
-    ```bash
-    hyprctl monitors                 # identify connected monitors
-    # HyDE stores monitor config in its own config chain
-    ```
-
-13. **Start swayosd daemon** (should auto-start, verify):
-    ```bash
-    # If volume/brightness OSD doesn't appear, check:
-    pgrep swayosd-server || uwsm-app -- swayosd-server
-    # Our autostart.conf handles this, but verify after first boot
-    ```
-
-14. **Authenticate GitHub CLI**
-    ```bash
-    gh auth login
-    ```
-
-15. **Copy Claude Code config**
-    ```bash
-    # From backup or old machine:
-    cp -r /path/to/backup/.claude ~/
-    ```
-
-16. **Configure 1Password + SSH agent**
-    - Install 1Password desktop app
-    - Enable SSH agent in 1Password settings
-    - Verify: `ssh-add -l`
-
-17. **Install keyd configs** (keyboard remapping):
+12. **keyd** (keyboard remapping):
     ```bash
     sudo pacman -S --needed keyd
-    sudo systemctl enable --now keyd
-
-    # Configs are stored in the chezmoi repo under keyd/
-    sudo cp ~/.local/share/chezmoi/keyd/common /etc/keyd/
-    sudo cp ~/.local/share/chezmoi/keyd/hhkb.conf /etc/keyd/
-
-    # internal.conf has a laptop-specific device ID — skip on desktop
-    # or update the [ids] section for your keyboard:
-    #   sudo keyd -m   # to find device IDs
-    #   Then edit /etc/keyd/internal.conf with the correct ID
-    sudo keyd reload
+    sudo cp ~/.local/share/chezmoi/keyd/common ~/.local/share/chezmoi/keyd/hhkb.conf /etc/keyd/
+    sudo systemctl enable --now keyd && sudo keyd reload
     ```
 
-18. **Import GPG keys** (if needed):
+13. **Runtimes, GitHub, 1Password, Claude, GPG**:
     ```bash
-    gpg --import /path/to/backup/private-key.asc
+    mise install
+    gh auth login
+    # Install 1Password desktop app, enable SSH agent; verify: ssh-add -l
+    cp -r /path/to/backup/.claude ~/          # Claude Code config
+    gpg --import /path/to/backup/private-key.asc   # if needed
     ```
 
-19. **Set up XCompose** (if using compose key for special characters):
+14. **Webapps + mimetypes** (recreate via `omarchy-webapp-install`; imv/mpv defaults):
     ```bash
-    # Our input.conf sets compose:caps (Caps Lock = Compose key)
-    # Copy your XCompose file from backup:
-    cp /path/to/backup/.XCompose ~/
-    # envs.conf sets XCOMPOSEFILE=~/.XCompose
+    bash ~/.local/share/omarchy/install/config/mimetypes.sh   # inspect first
+    # omarchy-webapp-install per app (chatgpt/claude/gmail/teams/work-email/youtube/youtube-music)
+    # teams keeps --ozone-platform=x11 in its .desktop Exec
     ```
 
-## Shell Setup
+Then reboot into the SDDM autologin session.
 
-20. **Fish shell in kitty**: HyDE uses zsh as the login shell (required for HyDE's shell integration). Our `kitty/custom.conf` sets `shell /usr/bin/fish` so kitty launches fish as the interactive shell. No changes to the system login shell needed.
+## Config ownership (mirror of ~/notes/CLAUDE.md)
 
-21. **Terminal and fish colors**: HyDE's wallbash handles terminal color theming. For fish-specific syntax highlighting colors, install and configure a fish theme via `fisher` after the initial apply (e.g., `fisher install folke/tokyonight.nvim` and `theme_tokyonight night`). Terminal color schemes (kitty, ghostty, alacritty) are managed by HyDE's theme system.
-
-## Laptop-Specific Setup
-
-21. **NVIDIA power management** (ThinkPad P1 Gen4 or similar hybrid GPU laptops):
-    ```bash
-    # Set initial power mode
-    power-mode status               # check current state
-    power-mode balanced             # or: performance, battery
-    # Requires reboot to fully apply (including BIOS GPU mode via ThinkLMI)
-    ```
-
-22. **Vivaldi browser wrappers** (if using Vivaldi with NVIDIA):
-    ```bash
-    # power-mode creates desktop files for GPU-specific browser launching
-    # and switches the default browser between them
-    ```
-
-23. **Verify laptop-specific features**:
-    ```bash
-    # Brightness keys should work via swayosd
-    # Keyboard backlight keys should work
-    # Touchpad gestures (3-finger horizontal = workspace switch)
-    # power-brightness script adjusts screen brightness on AC/battery
-    # hypridle: 2.5min lock on laptop vs 30min on desktop
-    ```
-
-## HyDE-Specific Notes
-
-### What HyDE Manages (don't touch with chezmoi)
-- `~/.config/hypr/` — Hyprland base config, monitor config, scripts
-- `~/.config/waybar/` — waybar config, themes, layouts
-- `~/.config/rofi/` — app launcher, emoji picker, clipboard
-- `~/.config/dunst/` — notification daemon
-- `~/.config/hypr/hyprlock.conf` — lock screen (use HyDE themes)
-- `~/.config/hypr/hypridle.conf` — idle behavior
-- `~/.local/share/hyde/` — HyDE internal data
-- GTK/QT theming — handled by HyDE's wallbash theme system
-
-### What We Override (via userprefs.conf bridge)
-- Appearance: 0 gaps, neutral border defaults (HyDE wallbash sets colors), animations
-- Keybindings: vim HJKL, app launchers, media keys with swayosd
-- Window rules: 25+ app-specific rules
-- Input: compose:caps, repeat rate, touchpad settings
-- Env vars: NVIDIA (conditional on gpu="nvidia"), XCompose
-- Autostart: fcitx5, swayosd, hyprsunset
-
-### HyDE Features Preserved (relocated keys)
-| Feature | New Key | Original HyDE Key |
-|---------|---------|-------------------|
-| Toggle split | `Super+Ctrl+J` | `Super+J` |
-| Game mode | `Super+Ctrl+G` | `Super+Alt+G` |
-| Wallpaper selector | `Super+Ctrl+Shift+W` | `Super+Shift+W` |
-| Rofi selector | `Super+Ctrl+Shift+A` | `Super+Shift+A` |
-| Select animations | `Super+Ctrl+Shift+Y` | `Super+Shift+Y` |
-| Game launcher | `Super+Ctrl+Shift+G` | `Super+Shift+G` |
-
-### HyDE Features Kept on Original Keys
-- `Super+Delete` — kill session
-- `Ctrl+Alt+Delete` — logout
-- `Super+Shift+F` — toggle pin (NOTE: our apps.conf overrides this with file manager)
-- `Super+Alt+T` — dropdown terminal
-- `Ctrl+Shift+Escape` — system monitor
-- `Super+Shift+E` — file finder
-- `Super+/` — keybindings hint
-- `Super+.` — glyph picker
-- `Super+Shift+V` — clipboard extended (favorites, multi-select, image OCR)
-- `Super+Ctrl+P` — freeze screenshot
-- `Super+Alt+P` — print monitor
-- `Super+Alt+Right/Left` — wallpaper cycle
-- `Super+Alt+Up/Down` — waybar layout
-- `Super+Shift+R` — wallbash reload
-- `Super+Shift+T` — theme selector
-- `Super+Shift+U` — hyprlock layout selector
-- `Super+Ctrl+Down/Right/Left` — workspace navigation
-- `Super+Ctrl+Alt+Right/Left` — move to relative workspace
-- `Super+Ctrl+M` — mute active window
-- `F10/F11/F12` — mute/volume
-- `Super+Z` — mouse move alt
-- `Super+Shift+Ctrl+Arrow` — move window
-- `Shift+F11` — fullscreen
-- `Alt_R+Control_R` — waybar toggle
-
-### HyDE `hyde-shell` Commands Reference
-| Command | What it does |
-|---------|-------------|
-| `hyde-shell rofilaunch d` | App launcher (rofi drun) |
-| `hyde-shell rofilaunch s` | Rofi selector |
-| `hyde-shell rofilaunch g` | Game launcher |
-| `hyde-shell emoji-picker` | Emoji picker |
-| `hyde-shell cliphist -c` | Clipboard history |
-| `hyde-shell waybar --hide` | Toggle waybar |
-| `hyde-shell gamemode` | Toggle game mode |
-| `hyde-shell wallpaper` | Wallpaper selector |
-| `hyde-shell animations` | Animation selector |
-
-### Dunst Notification Commands
-| Binding | Command | Action |
-|---------|---------|--------|
-| `Super+Comma` | `dunstctl close` | Close top notification |
-| `Super+Shift+Comma` | `dunstctl close-all` | Dismiss all |
-| `Super+Ctrl+Comma` | `dunstctl set-paused toggle` | Toggle DND |
-| `Super+Alt+Comma` | `dunstctl history-pop` | Show last notification |
-
-### HyDE Updates
-```bash
-# After HyDE updates, our userprefs.conf may get overwritten.
-# Re-apply to regenerate it:
-chezmoi apply
-
-# If HyDE changes break something:
-hyprctl reload                    # check for errors
-chezmoi diff                      # see what changed
-```
-
-## Architecture: Three-Layer Config
-
-- **Layer 1 — HyDE base**: owns `~/.config/hypr/`, waybar, rofi, dunst, hyprlock, hypridle
-- **Layer 2 — Our overrides**: `~/.config/hypr-custom/` managed by chezmoi (appearance, keybindings, window rules)
-- **Layer 3 — The bridge**: `run_onchange_` script writes source lines into HyDE's `userprefs.conf`
-
-HyDE sources `userprefs.conf` for user overrides, so our overrides win.
+- **chezmoi-owned** (edit source, apply, commit to branch `omarchy`):
+  `~/.config/hypr/hyprland.conf`, `monitors.conf`, `hypridle.conf`, all
+  `~/.config/hypr-custom/*`, `kitty/kitty.conf` + `custom.conf`,
+  `fontconfig/fonts.conf`, `uwsm/{env,default}`, `~/.bashrc`, `fish/conf.d/*`,
+  `xdg-terminals.list`, `walker/config.toml`, `~/.local/bin/*`.
+- **Omarchy-owned — never edit**: `~/.local/share/omarchy` (pinned clone),
+  `~/.config/omarchy/current/` (theme output, `omarchy-theme-set` regenerates),
+  `~/.local/state/omarchy/` (toggle state).
+- **Drift generators**: `omarchy-refresh-*` / `omarchy-theme-set` write into
+  `~/.config/hypr/*` — run `chezmoi diff` after and reconcile deliberately.
+- **Bindings**: Omarchy's default binding files are deliberately NOT sourced;
+  John's keymap wins. Passthrough submap (SUPER+F12) must stay last in the chain.
 
 ## Items NOT Managed by chezmoi
 
@@ -308,78 +170,30 @@ HyDE sources `userprefs.conf` for user overrides, so our overrides win.
 | `~/.gnupg/` | Copy keyring or re-import |
 | `~/.config/gh/` | Run `gh auth login` |
 | `~/.claude/` | Copy directory from old machine |
-| `~/.XCompose` | Copy from backup (envs.conf points to it) |
-| `~/.config/hypr/` | HyDE owns this — our overrides go in `hypr-custom/` |
-| `~/.config/waybar/` | HyDE owns |
-| `~/.config/rofi/` | HyDE owns |
-| `~/.config/dunst/` | HyDE owns |
-| `~/.local/share/hyde/` | HyDE internal data |
-| `~/.config/power-profiles/` | Auto-generated by `power-mode` |
-| `/etc/keyd/` | Stored in repo under `keyd/` — copy manually with `sudo` (see step 17) |
+| `~/.local/share/omarchy` | Pinned v3.8.3 clone (step 4) — never via installer |
+| `~/.config/omarchy/`, `~/.local/state/omarchy/` | Generated by `omarchy-theme-set` / toggles |
+| `/etc/keyd/` | Stored in repo under `keyd/` — copy manually with `sudo` (step 12) |
+| `/etc/sddm.conf.d/`, `/usr/share/sddm/hyprland.conf` | From Omarchy's login scripts (step 10) |
 
 ## Verification
 
 ```bash
-# Config structure
-chezmoi diff                                    # should show no diff after apply
-chezmoi managed | wc -l                         # verify managed file count
-chezmoi managed | grep hypr-custom              # should list ~11 override files
-chezmoi managed | grep -c "\.config/hypr/"      # should be 0 (HyDE owns hypr/)
-chezmoi execute-template '{{ .formFactor }}'    # should print "desktop" or "laptop"
+chezmoi execute-template '{{ .formFactor }}'        # "desktop" or "laptop"
+git -C ~/.local/share/chezmoi branch --show-current # "omarchy"
+cat ~/.local/share/omarchy/version                  # 3.8.3
+Hyprland --verify-config -c ~/.config/hypr/hyprland.conf   # no errors
+grep -ci hyde ~/.config/hypr/hyprland.conf          # 0
+gsettings get org.gnome.desktop.interface font-name # 'Inter 10'
+hyprctl binds -j | jq length                        # ~157
 
-# Bridge is working
-cat ~/.config/hypr/userprefs.conf               # should show source lines to hypr-custom/
-hyprctl reload                                  # should apply with no errors
-
-# Key features work
-# Super+H/J/K/L  — vim focus
-# Super+Space    — rofi launcher
-# Super+Ctrl+E   — emoji picker
-# Super+Ctrl+V   — clipboard manager
-# Super+Comma    — close notification (dunst)
-# Volume keys    — swayosd on-screen display
-# Super+Escape   — lock screen
-
-# HyDE features still work
-# Super+Shift+T  — theme selector
-# Super+Alt+Right/Left — wallpaper cycle
-# Super+Alt+Up/Down — waybar layouts
-# Super+Shift+R  — wallbash reload
-# Super+/        — keybindings hint
-```
-
-## Troubleshooting
-
-### hyprctl reload shows errors
-```bash
-# Check which file has the error:
-hyprctl reload 2>&1
-# Common cause: HyDE updated and changed a dispatcher name or option
-# Fix: update the relevant file in hypr-custom/ and chezmoi apply
-```
-
-### userprefs.conf got overwritten by HyDE update
-```bash
-chezmoi apply   # regenerates userprefs.conf via run_onchange_ script
-```
-
-### HyDE theme/wallpaper selector doesn't work
-HyDE themes should still work because we only override via userprefs.conf.
-If theme switching breaks, check that our appearance.conf isn't conflicting with
-HyDE's wallbash variables.
-
-### swayosd not showing
-```bash
-pgrep swayosd-server          # should be running
-systemctl --user status swayosd  # check systemd service
-uwsm-app -- swayosd-server    # start manually
-```
-
-### Fish shell not loading in kitty
-```bash
-# Verify kitty custom.conf has: shell /usr/bin/fish
-cat ~/.config/kitty/custom.conf | grep shell
-# HyDE uses zsh as login shell — fish is only for kitty interactive use
+# Key features:
+# Super+Space    — walker launcher
+# Super+C/V/X    — universal clipboard (sendshortcut)
+# Super+Escape   — omarchy system menu
+# Super+semicolon — mako dismiss
+# Super+Ctrl+K   — keybind help
+# Super+F12 x2   — passthrough submap in/out
+# loginctl lock-session — hyprlock + screens off (~3s)
 ```
 
 ---
@@ -560,7 +374,7 @@ Replicates Hyprland's tiling WM behavior on Windows — `Super+H/J/K/L` focus na
 
 ## What Is Excluded (desktop-only)
 Controlled by `.chezmoiignore` WSL detection — these files exist in the repo but are never deployed on WSL:
-- Hyprland / HyDE configs
+- Hyprland / Omarchy configs
 - Kitty, Alacritty, Ghostty terminal configs
 - Keyd keyboard remapping
 - Desktop scripts (gaming-mode, lock-screen, power management, etc.)
