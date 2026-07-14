@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=BTNet RDP
+Comment=Remote desktop to 10.10.10.12 (BT domain)
+Exec=btnet-rdp
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Categories=Network;RemoteAccess;
+StartupNotify=true

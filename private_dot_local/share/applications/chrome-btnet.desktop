@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Google Chrome (BTNet via SOCKS)
+GenericName=Web Browser
+Comment=Native Linux Chrome routed through SOCKS5 SSH tunnel to bt-lw1180 -> BTNet OpenVPN. For internal/VPN-only sites. Requires the btnet-socks-tunnel.service to be running.
+Exec=/usr/bin/google-chrome-stable --user-data-dir=/home/john/.config/google-chrome-bt --proxy-server=socks5://127.0.0.1:1080 --class=google-chrome-bt %U
+Terminal=false
+Type=Application
+Icon=google-chrome
+StartupWMClass=google-chrome-bt
+Categories=Network;WebBrowser;
+MimeType=

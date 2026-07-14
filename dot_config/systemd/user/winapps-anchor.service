@@ -1,0 +1,16 @@
+[Unit]
+Description=WinApps RAIL anchor (Explorer) - keeps freerdp session alive across wifi blips and screen locks
+Documentation=file:///home/john/notes/winapps-session-persistence.md
+After=graphical-session.target
+PartOf=graphical-session.target
+StartLimitIntervalSec=300
+StartLimitBurst=20
+
+[Service]
+Type=simple
+ExecStart=/home/john/.local/bin/winapps explorer
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical-session.target

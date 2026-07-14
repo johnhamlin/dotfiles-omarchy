@@ -11,6 +11,7 @@ powertoys-keyboard-manager.json
 .config/hypr/*
 !.config/hypr/hypridle.conf
 !.config/hypr/hyde.conf
+!.config/hypr/monitors.conf
 
 {{ if eq .chezmoi.os "windows" }}
 # Linux-only
