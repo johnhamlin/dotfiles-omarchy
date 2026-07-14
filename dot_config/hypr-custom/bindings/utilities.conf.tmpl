@@ -28,10 +28,11 @@ bindd = SUPER ALT, SPACE, Toggle top bar, exec, toggle-waybar
 bindd = SUPER, BACKSPACE, Toggle window transparency, exec, hyprctl dispatch setprop "address:$(hyprctl activewindow -j | jq -r '.address')" opaque toggle
 
 # Notifications — dunst (replaces swaync on ML4W)
-bindd = SUPER, COMMA, Close notification, exec, dunstctl close
-bindd = SUPER SHIFT, COMMA, Dismiss all notifications, exec, dunstctl close-all
-bindd = SUPER CTRL, COMMA, Toggle do-not-disturb, exec, dunstctl set-paused toggle
-bindd = SUPER ALT, COMMA, Show last notification, exec, dunstctl history-pop
+# Moved off comma: that key belongs to workspace cycling in bindings/tiling.conf.
+bindd = SUPER, semicolon, Close notification, exec, dunstctl close
+bindd = SUPER SHIFT, semicolon, Dismiss all notifications, exec, dunstctl close-all
+bindd = SUPER CTRL, semicolon, Toggle do-not-disturb, exec, dunstctl set-paused toggle
+bindd = SUPER ALT, semicolon, Show last notification, exec, dunstctl history-pop
 
 # Toggles
 bindd = SUPER CTRL, I, Toggle locking on idle, exec, pidof hypridle && pkill hypridle || uwsm-app -- hypridle
