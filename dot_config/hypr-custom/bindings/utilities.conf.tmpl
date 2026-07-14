@@ -1,19 +1,21 @@
-# App launcher — rofi via HyDE's hyde-shell
-bindd = SUPER, SPACE, Launch apps, exec, pkill -x rofi || hyde-shell rofilaunch d
-bindd = SUPER CTRL, E, Emoji picker, exec, hyde-shell emoji-picker
-bindd = SUPER CTRL, V, Clipboard manager, exec, hyde-shell cliphist -c
+# App launcher — Walker (Omarchy)
+bindd = SUPER, SPACE, Launch apps, exec, omarchy-launch-walker
+bindd = SUPER CTRL, E, Emoji picker, exec, omarchy-launch-walker -m symbols
+bindd = SUPER CTRL, V, Clipboard manager, exec, omarchy-launch-walker -m clipboard
 
 # Copy / Paste
 # Hyprland 0.55 switched sendshortcut's parser to CVarList2, which strips
 # trailing empty elements — so `..., CTRL, X,` now resolves to 2 args and
 # fails with "invalid args" silently (no configerror). Workaround: pass the
 # special `activewindow` token as the 3rd (window) arg.
+# (Omarchy's own clipboard.conf ships the identical binds — not sourced.)
 bindd = SUPER, C, Universal copy, sendshortcut, CTRL, Insert, activewindow
 bindd = SUPER, V, Universal paste, sendshortcut, SHIFT, Insert, activewindow
 bindd = SUPER, X, Universal cut, sendshortcut, CTRL, X, activewindow
 
-# Power menu
-bindd = SUPER, ESCAPE, Power menu, exec, hyde-shell logoutlaunch
+# System / power menu — Omarchy menu (lock, restart, shutdown live here)
+bindd = SUPER, ESCAPE, System menu, exec, omarchy-menu system
+bindd = SUPER SHIFT, ESCAPE, Omarchy menu, exec, omarchy-menu
 bindld = , XF86PowerOff, Lock screen, exec, loginctl lock-session
 
 # Screenshots
@@ -21,22 +23,24 @@ bindd = , PRINT, Screenshot, exec, hyprshot -m region
 bindd = SUPER SHIFT, PRINT, Screenshot to work WSL, exec, /home/john/.local/bin/shot2work
 bindd = SUPER, PRINT, Color picker, exec, pkill hyprpicker || hyprpicker -a
 
-# Waybar — delegate to HyDE's hyde-shell if available
-bindd = SUPER ALT, SPACE, Toggle top bar, exec, toggle-waybar
+# Waybar
+bindd = SUPER ALT, SPACE, Toggle top bar, exec, omarchy-toggle-waybar
 
 # Aesthetics
-bindd = SUPER, BACKSPACE, Toggle window transparency, exec, hyprctl dispatch setprop "address:$(hyprctl activewindow -j | jq -r '.address')" opaque toggle
+bindd = SUPER, BACKSPACE, Toggle window transparency, exec, omarchy-hyprland-window-transparency-toggle
+bindd = SUPER CTRL SHIFT, W, Next theme background, exec, omarchy-theme-bg-next
+bindd = SUPER CTRL SHIFT, T, Theme menu, exec, omarchy-menu theme
 
-# Notifications — dunst (replaces swaync on ML4W)
-# Moved off comma: that key belongs to workspace cycling in bindings/tiling.conf.
-bindd = SUPER, semicolon, Close notification, exec, dunstctl close
-bindd = SUPER SHIFT, semicolon, Dismiss all notifications, exec, dunstctl close-all
-bindd = SUPER CTRL, semicolon, Toggle do-not-disturb, exec, dunstctl set-paused toggle
-bindd = SUPER ALT, semicolon, Show last notification, exec, dunstctl history-pop
+# Notifications — mako (was dunst)
+bindd = SUPER, semicolon, Dismiss notification, exec, makoctl dismiss
+bindd = SUPER SHIFT, semicolon, Dismiss all notifications, exec, makoctl dismiss --all
+bindd = SUPER CTRL, semicolon, Toggle do-not-disturb, exec, omarchy-toggle-notification-silencing
+bindd = SUPER ALT, semicolon, Restore last notification, exec, makoctl restore
 
 # Toggles
-bindd = SUPER CTRL, I, Toggle locking on idle, exec, pidof hypridle && pkill hypridle || uwsm-app -- hypridle
-bindd = SUPER CTRL, N, Toggle nightlight, exec, pidof hyprsunset && pkill -x hyprsunset || uwsm-app -- hyprsunset
+bindd = SUPER CTRL, I, Toggle locking on idle, exec, omarchy-toggle-idle
+bindd = SUPER CTRL, N, Toggle nightlight, exec, omarchy-toggle-nightlight
+bindd = SUPER CTRL, G, Toggle game mode, exec, gaming-mode
 
 # Control panels
 bindd = SUPER CTRL, A, Audio controls, exec, uwsm-app -- pavucontrol
@@ -52,8 +56,8 @@ bindd = SUPER CTRL, Z, Zoom in, exec, hyprctl keyword cursor:zoom_factor $(hyprc
 bindd = SUPER CTRL ALT, Z, Reset zoom, exec, hyprctl keyword cursor:zoom_factor 1
 
 # Information
-bindd = SUPER CTRL, K, Search keybindings, exec, pkill -x rofi || hyde-shell keybinds_hint c
-bindd = SUPER CTRL ALT, T, Show time, exec, notify-send "    $(date +"%A %H:%M  —  %d %B W%V %Y")"
+bindd = SUPER CTRL, K, Search keybindings, exec, omarchy-menu-keybindings
+bindd = SUPER CTRL ALT, T, Show time, exec, notify-send "    $(date +\"%A %H:%M  —  %d %B W%V %Y\")"
 bindd = , XF86Calculator, Calculator, exec, gnome-calculator
 
 {{ if eq .formFactor "laptop" }}
