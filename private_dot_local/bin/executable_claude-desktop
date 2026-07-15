@@ -1,0 +1,7 @@
+#!/bin/bash
+# Shadow /usr/bin/claude-desktop: force the gnome-libsecret backend.
+# Chromium's desktop detection doesn't recognize XDG_CURRENT_DESKTOP=Hyprland,
+# so Electron safeStorage falls back to plaintext-none and OAuth tokens don't
+# persist across launches ("safeStorage not available" in main.log).
+# gnome-keyring is running with org.freedesktop.secrets on the session bus.
+exec /usr/lib/claude-desktop/claude-desktop --password-store=gnome-libsecret "$@"
