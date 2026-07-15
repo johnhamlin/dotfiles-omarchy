@@ -1,0 +1,13 @@
+#!/bin/bash
+# LOCAL SHADOW of Omarchy's omarchy-launch-wifi — ~/.local/bin precedes
+# ~/.local/share/omarchy/bin on PATH, so this wins for waybar's on-click,
+# the SUPER+CTRL+W bind, and omarchy-menu's Wifi entry alike.
+#
+# Why: this machine runs NetworkManager, not iwd. Stock impala talks iwd
+# and D-Bus-activates it; two supplicants fighting over wlan0 wedged the
+# ath12k firmware on 2026-07-15 (reboot-only recovery). iwd is now masked
+# and removed; wlctl is an impala fork with the same UI on NM.
+# Incident write-up: ~/notes/omarchy-migration-2026-07.md
+
+rfkill unblock wifi
+omarchy-launch-or-focus-tui wlctl

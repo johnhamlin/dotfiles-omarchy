@@ -45,7 +45,9 @@ bindd = SUPER CTRL, G, Toggle game mode, exec, gaming-mode
 # Control panels
 bindd = SUPER CTRL, A, Audio controls, exec, omarchy-launch-audio
 bindd = SUPER CTRL, B, Bluetooth controls, exec, omarchy-launch-bluetooth
-bindd = SUPER CTRL, W, Wifi controls, exec, omarchy-launch-wifi
+# Absolute path: our ~/.local/bin shadow (wlctl/NM, not impala/iwd) must win
+# regardless of session PATH order (2026-07-15 iwd incident).
+bindd = SUPER CTRL, W, Wifi controls, exec, ~/.local/bin/omarchy-launch-wifi
 bindd = SUPER CTRL, T, Activity, exec, omarchy-launch-tui btop
 
 # Dictation

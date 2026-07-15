@@ -111,6 +111,15 @@ keymap is authoritative and lives in chezmoi at
   validated on driver 610.x). If screens ever stay lit after lock, the
   HyDE-era 10×/300ms DPMS retry loop is the documented fallback — chezmoi
   commit `22e8f7f` of `dot_config/hypr/hypridle.conf`.
+- **WiFi is NetworkManager, NEVER iwd.** iwd is masked AND uninstalled; impala
+  is uninstalled. Stock `omarchy-launch-wifi` launches impala, which D-Bus
+  auto-starts iwd — two supplicants on wlan0 wedged the ath12k firmware on
+  2026-07-15 (scan -110, reboot-only recovery). The wifi TUI here is **wlctl**
+  (impala fork on NM), launched by a shadow script
+  `~/.local/bin/omarchy-launch-wifi`; `~/.local/bin` deliberately precedes
+  `$OMARCHY_PATH/bin` in the uwsm and fish PATH so local shadows of omarchy-*
+  names win. Never install impala/iwd, never unmask iwd, never "fix" the PATH
+  order back to Omarchy-first.
 - **Suspend is hidden** from the system menu via the `suspend-off` toggle.
 - **Monitors**: John edits layout with nwg-displays, which regenerates the
   deployed `monitors.conf` → shows up as chezmoi drift → ADOPT it

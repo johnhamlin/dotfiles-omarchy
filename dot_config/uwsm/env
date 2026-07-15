@@ -1,6 +1,8 @@
 # Managed by chezmoi. Sourced by uwsm at session start (POSIX sh).
 export OMARCHY_PATH=$HOME/.local/share/omarchy
-export PATH=$OMARCHY_PATH/bin:$HOME/.local/bin:$PATH
+# ~/.local/bin FIRST: local shadows of omarchy-* scripts must win
+# (e.g. omarchy-launch-wifi -> wlctl/NM instead of impala/iwd, 2026-07-15).
+export PATH=$HOME/.local/bin:$OMARCHY_PATH/bin:$PATH
 
 # Mise-managed runtimes for GUI apps / user services (shims only)
 command -v mise >/dev/null 2>&1 && eval "$(mise activate bash --shims)"
