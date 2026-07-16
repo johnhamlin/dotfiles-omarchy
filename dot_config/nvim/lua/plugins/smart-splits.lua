@@ -7,9 +7,15 @@
 --     @pane-is-vim user option on the current tmux pane; tmux's own bindings
 --     (see ~/.config/tmux/tmux.conf) check it and either send the key through
 --     to nvim or run select-pane themselves.
---   * Outside both, in WezTerm — async wezterm CLI hop at the edge.
+--   * In bare kitty ($KITTY_LISTEN_ON set) — smart-splits' kitty integration
+--     signals the IS_NVIM user var that custom.conf's `--when-focus-on var:IS_NVIM`
+--     maps key off of, and hops panes with `kitten neighboring_window.py` at the
+--     edge. It must be named explicitly: multiplexer_integration = false skips
+--     the auto-detect that would otherwise pick kitty.
+--   * Outside all three, in WezTerm — async wezterm CLI hop at the edge.
 local in_zellij = vim.env.ZELLIJ ~= nil and vim.env.ZELLIJ ~= ""
 local in_tmux = vim.env.TMUX ~= nil and vim.env.TMUX ~= ""
+local in_kitty = vim.env.KITTY_LISTEN_ON ~= nil and vim.env.KITTY_LISTEN_ON ~= ""
 
 local function move_or_wezterm(move_fn, wez_direction)
   return function()
@@ -33,6 +39,7 @@ end
 local function mux()
   if in_zellij then return "zellij" end
   if in_tmux then return "tmux" end
+  if in_kitty then return "kitty" end
   return false
 end
 
