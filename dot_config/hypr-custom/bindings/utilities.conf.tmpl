@@ -55,6 +55,9 @@ bindd = SUPER CTRL, T, Activity, exec, omarchy-launch-tui btop
 # Dictation
 bindd = SUPER CTRL, X, Toggle dictation, exec, voxtype record toggle
 
+# Screen recording (stock Omarchy combo; menu picks region/audio, same combo stops)
+bindd = ALT, PRINT, Screenrecording, exec, omarchy-menu screenrecord
+
 # Zoom
 bindd = SUPER CTRL, Z, Zoom in, exec, hyprctl keyword cursor:zoom_factor $(hyprctl getoption cursor:zoom_factor -j | jq '.float + 1')
 bindd = SUPER CTRL ALT, Z, Reset zoom, exec, hyprctl keyword cursor:zoom_factor 1
