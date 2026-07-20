@@ -14,6 +14,10 @@ else
   touch "$LCK"
   hyprctl keyword monitor "DP-2, disable"
   hyprctl keyword monitor "DP-3, disable"
+  # Forced HDR mode for DP-1. cm,hdr not cm,auto: auto's content-driven switch
+  # provably fails to engage for gamescope HDR content on this stack
+  # (2026-07-20). Desktop default stays srgb — see elden-ring-hdr-pause.md.
+  hyprctl keyword monitor "DP-1, 3840x2160@240.02, 1440x511, 1.5, cm, hdr, bitdepth, 10"
   # Single monitor: hardware cursors are safe (the NVIDIA bug is at rotated boundaries)
   hyprctl keyword cursor:no_hardware_cursors false
   hyprctl keyword animations:enabled 0

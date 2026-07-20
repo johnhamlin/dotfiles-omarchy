@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Toggle SIGSTOP/SIGCONT on a game process (default: Elden Ring).
+# Bound to SUPER+CTRL+P in hypr-custom/bindings/utilities.conf.
+# Online caveat: freezing the process kills the EAC/server heartbeat —
+# expect a disconnect if used while connected to multiplayer.
+set -uo pipefail
+
+proc="${1:-eldenring.exe}"
+pid="$(pgrep -n -x "$proc")"
+
+if [[ -z "$pid" ]]; then
+    notify-send "Game pause" "$proc not found"
+    exit 1
+fi
+
+state="$(awk '/^State:/ {print $2}' "/proc/$pid/status")"
+
+if [[ "$state" == "T" ]]; then
+    kill -CONT "$pid"
+    notify-send "Game pause" "$proc resumed"
+else
+    kill -STOP "$pid"
+    notify-send "Game pause" "$proc PAUSED"
+fi

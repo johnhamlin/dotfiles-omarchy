@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Toggle HDR-capable mode on DP-1 only, leaving DP-2/DP-3 and all other
+# gaming-mode tweaks alone. Composable with gaming-mode (which sets the same
+# DP-1 mode as part of its takeover). Pure keyword both ways — no hyprctl
+# reload, so it never clobbers gaming-mode's monitor-disable keywords.
+# NB: gaming-mode OFF does a full reload, which also reverts this.
+# Desktop default stays srgb: cm,auto full-time oversaturates SDR apps
+# (Chrome worst). See elden-ring-hdr-pause.md.
+set -euo pipefail
+
+cur="$(hyprctl monitors -j | jq -r '.[] | select(.name=="DP-1") | .colorManagementPreset')"
+
+if [[ "$cur" == "srgb" ]]; then
+  # cm,hdr (forced), NOT cm,auto: auto's content-driven HDR switch provably
+  # fails to engage for gamescope HDR content on this stack (2026-07-20) —
+  # output stayed 'wide' and the game got tone-mapped to SDR.
+  hyprctl keyword monitor "DP-1, 3840x2160@240.02, 1440x511, 1.5, cm, hdr, bitdepth, 10"
+  notify-send "HDR mode ON" "DP-1 HDR (forced), 10-bit"
+else
+  hyprctl keyword monitor "DP-1, 3840x2160@240.02, 1440x511, 1.5"
+  notify-send "HDR mode OFF" "DP-1 back to sRGB 8-bit"
+fi
