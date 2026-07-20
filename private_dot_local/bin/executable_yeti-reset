@@ -1,0 +1,22 @@
+#!/bin/bash
+# Reset the Blue Yeti's USB interface when capture wedges (mic enumerates but
+# delivers zero audio — see ~/notes/blue-yeti-wedged-capture.md).
+set -e
+sudo /usr/bin/usbreset 046d:0ab7
+sleep 2
+node=$(wpctl status | grep -A6 'Sources:' | grep 'Blue Microphones' | grep -oE '[0-9]+' | head -1)
+if [[ -n $node ]]; then
+    echo "Yeti back as PipeWire source $node. Testing 3s capture..."
+    timeout 3 pw-record --target "$node" /tmp/yeti-reset-test.wav || true
+    size=$(stat -c%s /tmp/yeti-reset-test.wav 2>/dev/null || echo 0)
+    rm -f /tmp/yeti-reset-test.wav
+    if (( size > 1000 )); then
+        echo "OK: capture delivering data ($size bytes)."
+    else
+        echo "STILL WEDGED: capture produced $size bytes. Unplug/replug the mic."
+        exit 1
+    fi
+else
+    echo "Yeti not found in wpctl sources after reset. Unplug/replug the mic."
+    exit 1
+fi
