@@ -1,7 +1,22 @@
 #!/bin/sh
-pw=$(rofi -dmenu -password -p "BTNet password" -lines 0) || exit 0
-[ -z "$pw" ] && exit 0
-printf '%s\n' "$pw" | exec xfreerdp3 \
+# BTNet RDP launcher. Runs inside kitty (see btnet-rdp.desktop): shows xfreerdp
+# output while connecting, closes the terminal once the RDP window is mapped,
+# stays open on failure so the error is readable.
+# Password lives in gnome-keyring; store/rotate it with:
+#   secret-tool store --label='BTNet RDP (BT\john.hamlin)' service btnet-rdp user john.hamlin
+set -u
+
+hold() { printf '\n%s\n\nPress Enter to close... ' "$1"; read -r _; exit 1; }
+
+pw=$(secret-tool lookup service btnet-rdp user john.hamlin) || hold \
+"No stored password. Store it with:
+  secret-tool store --label='BTNet RDP (BT\\john.hamlin)' service btnet-rdp user john.hamlin"
+
+log=$(mktemp /tmp/btnet-rdp.XXXXXX.log)
+echo "Connecting to BTNet (log: $log)..."
+
+# setsid detaches xfreerdp from the terminal so it survives this window closing
+printf '%s\n' "$pw" | setsid xfreerdp3 \
   /f \
   /u:john.hamlin \
   /d:BT \
@@ -15,4 +30,22 @@ printf '%s\n' "$pw" | exec xfreerdp3 \
   /scale:140 \
   /gfx:RFX \
   /auto-reconnect \
-  /auto-reconnect-max-retries:20
+  /auto-reconnect-max-retries:20 \
+  >"$log" 2>&1 &
+rdp=$!
+
+tail -f "$log" &
+tailpid=$!
+
+while kill -0 "$rdp" 2>/dev/null; do
+  if hyprctl clients -j 2>/dev/null | grep -qiE "\"pid\": $rdp,|\"class\": \"[^\"]*freerdp"; then
+    kill "$tailpid" 2>/dev/null
+    exit 0
+  fi
+  sleep 0.3
+done
+
+kill "$tailpid" 2>/dev/null
+wait "$rdp"
+status=$?
+hold "xfreerdp exited before the window appeared (status $status). Full log: $log"
