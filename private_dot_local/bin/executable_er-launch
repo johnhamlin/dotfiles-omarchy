@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Elden Ring launch wrapper — Steam launch options route %command% through this.
+# Toggle with `renodx-toggle`; takes effect on next game launch.
+#
+#   ~/.config/er-modded present  => MODDED OFFLINE: EAC bypassed (run
+#     eldenring.exe directly, not start_protected_game.exe) AND ReShade/RenoDX
+#     injected (dxgi.dll native override).
+#   absent                       => VANILLA ONLINE: stock EAC launch, no
+#     injection (dxgi.dll ignored by wine's default builtin preference).
+#
+# The two are coupled BY DESIGN: there is no reachable state that injects a
+# DLL into a live EAC session (ban risk). Don't split them.
+set -uo pipefail
+MODE_FILE="$HOME/.config/er-modded"
+
+if [[ -f $MODE_FILE ]]; then
+  export WINEDLLOVERRIDES="${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}dxgi=n,b"
+  args=()
+  for a in "$@"; do
+    [[ $a == *start_protected_game.exe ]] && a="${a%start_protected_game.exe}eldenring.exe"
+    args+=("$a")
+  done
+  set -- "${args[@]}"
+fi
+
+exec "$@"

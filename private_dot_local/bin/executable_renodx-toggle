@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Toggle Elden Ring between MODDED OFFLINE (RenoDX HDR fix, EAC bypassed) and
+# VANILLA ONLINE (stock EAC, no injection). Read by er-launch at game start —
+# takes effect on NEXT launch, not mid-game.
+set -euo pipefail
+MODE_FILE="$HOME/.config/er-modded"
+
+if [[ -f $MODE_FILE ]]; then
+  rm -f "$MODE_FILE"
+  notify-send "Elden Ring: VANILLA ONLINE" "EAC on, no RenoDX (next launch)"
+else
+  touch "$MODE_FILE"
+  notify-send "Elden Ring: MODDED OFFLINE" "RenoDX on, EAC bypassed (next launch)"
+fi
