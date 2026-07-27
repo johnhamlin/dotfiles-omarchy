@@ -1,17 +1,54 @@
 #!/bin/bash
-# Detect the "RAIL channel died but freerdp lived" failure mode:
-# a Microsoft Outlook-class window whose title flipped to "FreeRDP: <host>"
-# (freerdp fell back to a plain desktop window, renders black).
-# Restart=always on winapps-anchor never fires because the process is alive.
+# WinApps RAIL self-healing, two failure modes (see
+# ~/notes/winapps-setup-debugging.md + winapps-session-persistence.md):
+#
+# 1. RAIL channel died but freerdp lived: window title flips to
+#    "FreeRDP: <host>" (black desktop-mode window). Restart=always on
+#    winapps-anchor never fires because the process is alive.
+#    -> restart the anchor.
+# 2. Missed first frame: a freshly mapped/tiled Outlook window loses the
+#    race between its initial full frame and the tile resize, staying
+#    pixel-blank. A focus + keystroke makes the server repaint.
+#    -> focus, F5 (Send/Receive - harmless), restore previous focus.
+#    Only fires when the window is genuinely blank, so it never disturbs
+#    a window that is in actual use.
 # Ran by winapps-rail-watchdog.timer every 2 min.
-# See ~/notes/winapps-setup-debugging.md + winapps-session-persistence.md.
 
-set -euo pipefail
+set -uo pipefail
 
-broken=$(hyprctl clients -j | jq -r \
-  '[.[] | select(.class == "Microsoft Outlook" and (.title | startswith("FreeRDP:")))] | length')
+clients=$(hyprctl clients -j)
 
+# --- Mode 1: dead RAIL channel ---
+broken=$(jq -r '[.[] | select(.class == "Microsoft Outlook" and (.title | startswith("FreeRDP:")))] | length' <<<"$clients")
 if [ "${broken:-0}" -gt 0 ]; then
     echo "RAIL channel dead (title=FreeRDP:*) — restarting winapps-anchor"
     systemctl --user restart winapps-anchor.service
+    exit 0
+fi
+
+# --- Mode 2: blank Inbox window ---
+addr=$(jq -r '[.[] | select(.class == "Microsoft Outlook" and (.title | contains("Inbox")))] | first | .address // empty' <<<"$clients")
+[ -z "$addr" ] && exit 0
+
+xid=""
+for id in $(DISPLAY=:0 xprop -root _NET_CLIENT_LIST 2>/dev/null | grep -o '0x[0-9a-f]*'); do
+    if DISPLAY=:0 xprop -id "$id" WM_NAME 2>/dev/null | grep -q 'Inbox'; then
+        xid=$id; break
+    fi
+done
+[ -z "$xid" ] && exit 0
+
+tmp=$(mktemp /tmp/rail-blank-XXXX.png)
+trap 'rm -f "$tmp"' EXIT
+DISPLAY=:0 timeout 10 import -window "$xid" "$tmp" 2>/dev/null || exit 0
+colors=$(magick identify -format '%k' "$tmp" 2>/dev/null)
+
+if [ -n "$colors" ] && [ "$colors" -le 4 ]; then
+    echo "Inbox window pixel-blank (${colors} colors) — nudging repaint"
+    prev=$(hyprctl activewindow -j | jq -r '.address // empty')
+    hyprctl dispatch focuswindow "address:$addr"
+    sleep 0.5
+    wtype -k F5
+    sleep 0.5
+    [ -n "$prev" ] && [ "$prev" != "$addr" ] && hyprctl dispatch focuswindow "address:$prev"
 fi
