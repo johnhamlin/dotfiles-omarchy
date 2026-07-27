@@ -5,13 +5,13 @@ description: >
   window rules, keybindings, monitors, gaps, borders, opacity, waybar, walker,
   mako, terminal config, themes, wallpaper, night light, idle/lock behavior,
   screenshots, reminders, or any omarchy-* command. This is a CachyOS + pinned
-  Omarchy 3.8.3 HYBRID — the stock Omarchy skill's advice is wrong here in
+  Omarchy 3.8.4 HYBRID — the stock Omarchy skill's advice is wrong here in
   load-bearing ways. Read this before editing anything under ~/.config/.
 ---
 
 # Omarchy on beast-cachy (CachyOS hybrid) — adapted skill
 
-**This is NOT a stock Omarchy machine.** It is CachyOS with Omarchy 3.8.3 as a
+**This is NOT a stock Omarchy machine.** It is CachyOS with Omarchy 3.8.4 as a
 *pinned, never-updated* desktop layer, migrated from HyDE on 2026-07-14. The
 upstream skill this file replaces assumes a stock install; following it here
 breaks the machine's config management. Authoritative references:
@@ -44,7 +44,7 @@ git -C ~/.local/share/chezmoi add -A && git -C ~/.local/share/chezmoi commit
 `~/.claude/skills/omarchy/` (this file).
 
 **Omarchy-owned, never edit** (reading is encouraged):
-`~/.local/share/omarchy` (pinned v3.8.3 clone — parts catalog),
+`~/.local/share/omarchy` (pinned v3.8.4 clone — parts catalog),
 `~/.config/omarchy/current/` (theme output), `~/.local/state/omarchy/`
 (toggle flags).
 
@@ -67,7 +67,7 @@ git -C ~/.local/share/chezmoi add -A && git -C ~/.local/share/chezmoi commit
 
 ```bash
 git -C ~/.local/share/omarchy fetch --tags
-git -C ~/.local/share/omarchy diff v3.8.3..<new-tag> -- migrations/   # review EVERY script
+git -C ~/.local/share/omarchy diff v3.8.4..<new-tag> -- migrations/   # review EVERY script
 # apply wanted changes selectively by hand, then move the pin:
 git -C ~/.local/share/omarchy checkout <new-tag>
 ```
