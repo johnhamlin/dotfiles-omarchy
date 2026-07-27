@@ -1,0 +1,17 @@
+#!/bin/bash
+# Detect the "RAIL channel died but freerdp lived" failure mode:
+# a Microsoft Outlook-class window whose title flipped to "FreeRDP: <host>"
+# (freerdp fell back to a plain desktop window, renders black).
+# Restart=always on winapps-anchor never fires because the process is alive.
+# Ran by winapps-rail-watchdog.timer every 2 min.
+# See ~/notes/winapps-setup-debugging.md + winapps-session-persistence.md.
+
+set -euo pipefail
+
+broken=$(hyprctl clients -j | jq -r \
+  '[.[] | select(.class == "Microsoft Outlook" and (.title | startswith("FreeRDP:")))] | length')
+
+if [ "${broken:-0}" -gt 0 ]; then
+    echo "RAIL channel dead (title=FreeRDP:*) — restarting winapps-anchor"
+    systemctl --user restart winapps-anchor.service
+fi
