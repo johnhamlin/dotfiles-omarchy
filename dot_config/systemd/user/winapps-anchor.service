@@ -9,8 +9,9 @@ StartLimitBurst=20
 [Service]
 Type=simple
 ExecStart=/home/john/.local/bin/winapps outlook-o365
-Restart=always
-RestartSec=10
+# Restart disabled 2026-07-27: with the BT 10-min idle-lock GPO killing RAIL,
+# auto-restart means Outlook "pops up" endlessly. On-demand mode: dies quietly.
+Restart=no
 
 [Install]
 WantedBy=graphical-session.target
