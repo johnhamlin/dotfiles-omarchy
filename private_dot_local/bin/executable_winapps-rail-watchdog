@@ -26,6 +26,17 @@ if [ "${broken:-0}" -gt 0 ]; then
     exit 0
 fi
 
+# --- Mode 3: dedupe Inbox windows ---
+# Every anchor restart relaunches OUTLOOK.EXE; if Outlook is already
+# running that opens another inbox window (OUTLOOK /recycle is broken
+# via WinApps cmd: quoting — see notes). Keep the largest, close the rest.
+mapfile -t dupes < <(jq -r '[.[] | select(.class == "Microsoft Outlook" and (.title | contains("Inbox")))] | sort_by(-(.size[0] * .size[1])) | .[1:] | .[].address' <<<"$clients")
+for d in "${dupes[@]}"; do
+    [ -n "$d" ] || continue
+    echo "closing duplicate Inbox window $d"
+    hyprctl dispatch closewindow "address:$d"
+done
+
 # --- Mode 2: blank Inbox window ---
 addr=$(jq -r '[.[] | select(.class == "Microsoft Outlook" and (.title | contains("Inbox")))] | first | .address // empty' <<<"$clients")
 [ -z "$addr" ] && exit 0
