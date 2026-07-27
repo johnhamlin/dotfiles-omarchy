@@ -1,0 +1,10 @@
+[Unit]
+Description=Run winapps-rail-watchdog every 2 minutes
+PartOf=graphical-session.target
+
+[Timer]
+OnActiveSec=2min
+OnUnitActiveSec=2min
+
+[Install]
+WantedBy=graphical-session.target

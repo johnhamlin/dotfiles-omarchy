@@ -1,0 +1,8 @@
+[Unit]
+Description=Restart winapps-anchor when the RAIL channel died but freerdp lived (black FreeRDP: window)
+Documentation=file:///home/john/notes/winapps-session-persistence.md
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/john/.local/bin/winapps-rail-watchdog
