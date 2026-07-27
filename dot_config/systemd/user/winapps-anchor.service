@@ -1,5 +1,5 @@
 [Unit]
-Description=WinApps RAIL anchor (Explorer) - keeps freerdp session alive across wifi blips and screen locks
+Description=WinApps RAIL anchor (Outlook) - keeps freerdp session alive; mail window is the anchor app
 Documentation=file:///home/john/notes/winapps-session-persistence.md
 After=graphical-session.target
 PartOf=graphical-session.target
@@ -8,7 +8,7 @@ StartLimitBurst=20
 
 [Service]
 Type=simple
-ExecStart=/home/john/.local/bin/winapps explorer
+ExecStart=/home/john/.local/bin/winapps outlook-o365
 Restart=always
 RestartSec=10
 
