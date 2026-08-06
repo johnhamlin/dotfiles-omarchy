@@ -167,6 +167,9 @@ chmod +x ~/.local/bin/lua-language-server'
   "${RS[@]}" "$OVERRIDES/inputrc"      "$HOST:.inputrc"
   # A login shell (what `ssh pwn` starts) reads .bash_profile, NOT .bashrc.
   "${RS[@]}" "$OVERRIDES/bash_profile" "$HOST:.bash_profile"
+  # starship prompt: default config path is ~/.config/starship.toml (no env var
+  # needed). Leads with the hostname = the loaded challenge.
+  "${RS[@]}" "$OVERRIDES/starship.toml" "$HOST:.config/starship.toml"
 
   if [[ ${#DRY[@]} -gt 0 ]]; then
     echo "==> dry run complete; skipping verification"
@@ -335,6 +338,17 @@ grep -q 'ble-attach' ~/.bashrc || wire_ok=0               # attaches
 [[ $wire_ok -eq 1 ]] && say "login chain wired (.bash_profile->.bashrc->ble.sh, vi, autosuggest)" "PASS" \
   || { say "login chain wiring" "FAIL"; fail=1; }
 command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
+
+# 11. starship prompt actually renders the hostname (the loaded challenge) and
+#     NOT the [Docker] container label.
+if command -v starship >/dev/null; then
+  hn="$(hostname)"
+  prompt="$(starship prompt 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')"
+  if [[ "$prompt" == *"$hn"* ]]; then say "prompt shows hostname ($hn)" "PASS"
+  else say "prompt shows hostname" "FAIL (got: ${prompt:0:60})"; fail=1; fi
+  [[ "$prompt" == *Docker* ]] && { say "  [Docker] label removed" "FAIL"; fail=1; } \
+                             || say "  [Docker] label removed" "PASS"
+else say "starship" "FAIL"; fail=1; fi
 
 echo "----------------------------------------------------------------------"
 [[ $fail -eq 0 ]] && echo "  RESULT: all hard checks passed" || echo "  RESULT: FAILURES above"
