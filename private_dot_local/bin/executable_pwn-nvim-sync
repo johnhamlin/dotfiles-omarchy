@@ -1,0 +1,258 @@
+#!/usr/bin/env bash
+# pwn-nvim-sync -- push John's LazyVim environment to the pwn.college dojo box.
+#
+# The dojo container (ssh host `pwn`, /home/hacker) has NO network, NO git, and
+# NO node. So nothing can be installed there: the entire environment is rsynced
+# from this desktop over SSH, and the parts that would reach for the network are
+# neutralized by override files layered on top of the normal config.
+#
+# What gets pushed:
+#   ~/.config/nvim                      -> pwn:~/.config/nvim   (minus dropped
+#                                          plugin specs, plus override layer)
+#   ~/.local/share/nvim/lazy            -> pwn:  (all plugins, pre-cloned)
+#   ~/.local/share/nvim/site/{parser,queries} -> pwn:  (compiled TS parsers)
+#   selected mason binaries            -> pwn:~/.local/bin + ~/.local/share
+#
+# Idempotent. Safe to re-run whenever the local config changes. The override
+# sources live in ~/notes/pwn-college-nvim/overrides and are the source of
+# truth for the dojo-only differences -- never edit config on the dojo box.
+#
+# Usage:
+#   pwn-nvim-sync [--dry-run] [--verify-only] [--host NAME]
+set -euo pipefail
+
+HOST=pwn
+DRY=()
+VERIFY_ONLY=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY=(--dry-run); shift ;;
+    --verify-only) VERIFY_ONLY=1; shift ;;
+    --host) HOST="$2"; shift 2 ;;
+    -h|--help) grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+CFG="$HOME/.config/nvim"
+DATA="$HOME/.local/share/nvim"
+MASON="$DATA/mason/packages"
+OVERRIDES="$HOME/notes/pwn-college-nvim/overrides"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+
+# rsync flags. -a preserves symlinks (site/queries/* are symlinks into lazy/,
+# which resolve on the dojo because we rsync to identical absolute paths).
+RS=(rsync -a --info=stats1 "${DRY[@]}")
+
+# Plugin spec files that make no sense offline / on the dojo and are excluded
+# from the config push. Everything else in lua/plugins is kept as-is.
+CONFIG_EXCLUDES=(
+  --exclude 'lua/plugins/diffview.lua'        # needs git
+  --exclude 'lua/plugins/jupyter.lua'         # molten/image/quarto: node + venv
+  --exclude 'lua/plugins/kitty-scrollback.lua' # needs the kitty kitten binary
+  --exclude 'lua/plugins/leetcode.lua'        # network
+  --exclude 'lua/plugins/minuet.lua'          # AI provider over network
+  --exclude 'lua/plugins/obsidian.lua'        # vault path that doesn't exist
+  --exclude 'lua/plugins/octo.lua'            # github + node
+  --exclude 'lua/plugins/markdownlint.lua'    # markdownlint-cli2 is node
+  --exclude 'lua/plugins/example.lua'         # LazyVim TS-centric template
+  --exclude 'lua/plugins/.claude'             # unrelated
+  --exclude '.git'
+  --exclude '.gitignore'
+)
+
+require_override() {
+  [[ -f "$1" ]] || { echo "missing override source: $1" >&2; exit 1; }
+}
+
+if [[ "$VERIFY_ONLY" -eq 0 ]]; then
+  echo "==> staging nvim config"
+  for f in \
+    "$OVERRIDES/lua/config/lazy.lua" \
+    "$OVERRIDES/lua/config/options.lua" \
+    "$OVERRIDES/lua/plugins/zz-pwn-offline.lua" \
+    "$OVERRIDES/lua/plugins/zz-pwn.lua" \
+    "$OVERRIDES/lazyvim.json"; do
+    require_override "$f"
+  done
+
+  # Base config into the staging dir, minus the dropped specs.
+  rsync -a "${CONFIG_EXCLUDES[@]}" "$CFG/" "$STAGE/"
+  # Layer the dojo-only overrides on top (these win).
+  cp "$OVERRIDES/lua/config/lazy.lua"            "$STAGE/lua/config/lazy.lua"
+  cp "$OVERRIDES/lua/config/options.lua"         "$STAGE/lua/config/options.lua"
+  cp "$OVERRIDES/lua/plugins/zz-pwn-offline.lua" "$STAGE/lua/plugins/zz-pwn-offline.lua"
+  cp "$OVERRIDES/lua/plugins/zz-pwn.lua"         "$STAGE/lua/plugins/zz-pwn.lua"
+  cp "$OVERRIDES/lazyvim.json"                   "$STAGE/lazyvim.json"
+
+  echo "==> [1/4] pushing config  ->  $HOST:~/.config/nvim"
+  ssh "$HOST" 'mkdir -p ~/.config/nvim ~/.local/share/nvim/site ~/.local/bin ~/.local/share'
+  "${RS[@]}" --delete \
+    --exclude 'lua/plugins/zz-pwn-local.lua' \
+    "$STAGE/" "$HOST:.config/nvim/"
+
+  echo "==> [2/4] pushing plugins ->  $HOST:~/.local/share/nvim/lazy  (~284M, first run only)"
+  "${RS[@]}" "$DATA/lazy/" "$HOST:.local/share/nvim/lazy/"
+
+  echo "==> [3/4] pushing treesitter parsers + queries"
+  "${RS[@]}" "$DATA/site/parser"  "$HOST:.local/share/nvim/site/"
+  "${RS[@]}" "$DATA/site/queries" "$HOST:.local/share/nvim/site/"
+
+  echo "==> [4/4] pushing LSP servers / formatters -> $HOST:~/.local/bin"
+  # Direct single-file ELF binaries: ship the resolved real file.
+  for name in stylua shellcheck shfmt; do
+    real="$(readlink -f "$DATA/mason/bin/$name" 2>/dev/null || true)"
+    if [[ -n "$real" && -f "$real" ]]; then
+      "${RS[@]}" "$real" "$HOST:.local/bin/$name"
+    else
+      echo "   warn: $name not found locally, skipping" >&2
+    fi
+  done
+  # lua-language-server: ships as a package tree + a regenerated wrapper,
+  # because the mason wrapper hardcodes the local /home/john path.
+  if [[ -d "$MASON/lua-language-server/libexec" ]]; then
+    "${RS[@]}" --delete "$MASON/lua-language-server/libexec/" \
+      "$HOST:.local/share/lua-language-server/"
+    ssh "$HOST" 'cat > ~/.local/bin/lua-language-server <<'"'"'EOF'"'"'
+#!/usr/bin/env bash
+exec "$HOME/.local/share/lua-language-server/bin/lua-language-server" "$@"
+EOF
+chmod +x ~/.local/bin/lua-language-server'
+  fi
+
+  if [[ ${#DRY[@]} -gt 0 ]]; then
+    echo "==> dry run complete; skipping verification"
+    exit 0
+  fi
+fi
+
+echo
+echo "======================================================================"
+echo "  VERIFICATION  (running on $HOST)"
+echo "======================================================================"
+
+# The verifier runs headless nvim and prints PASS/FAIL lines. It exits nonzero
+# if any hard check fails so the script's own exit status is meaningful.
+# The verifier is written to a remote temp file and executed with stdin
+# detached (</dev/null). Piping the script straight into `bash -s` makes every
+# child process (nvim in particular) inherit the heredoc as stdin and eat the
+# rest of the script. `cat > file` drains the heredoc to EOF first, then bash
+# runs it clean.
+ssh "$HOST" 'cat > /tmp/pwn-nvim-verify.sh && PATH="$HOME/.local/bin:$PATH" bash /tmp/pwn-nvim-verify.sh </dev/null; rc=$?; rm -f /tmp/pwn-nvim-verify.sh; exit $rc' <<'REMOTE'
+set -u
+fail=0
+say() { printf '%-58s %s\n' "$1" "$2"; }
+
+# 1. Clean startup -- this is the exact failure we are fixing.
+err="$(nvim --headless -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -viE 'IS_NVIM|SetUserVar' || true)"
+if [[ -z "$err" ]]; then say "startup (headless, no errors)" "PASS"; else
+  say "startup (headless, no errors)" "FAIL"; echo "$err" | sed 's/^/      /'; fail=1; fi
+
+# 2. Parser load: every compiled parser must load into this nvim build.
+nvim --headless -c 'lua
+  local dir = vim.fn.expand("~/.local/share/nvim/site/parser")
+  local bad = {}
+  for _, so in ipairs(vim.fn.glob(dir.."/*.so", true, true)) do
+    local lang = vim.fn.fnamemodify(so, ":t:r")
+    local ok = pcall(vim.treesitter.language.add, lang)
+    if not ok then table.insert(bad, lang) end
+  end
+  local n = #vim.fn.glob(dir.."/*.so", true, true)
+  if #bad == 0 then print(("PARSERS_OK %d"):format(n))
+  else print("PARSERS_BAD "..table.concat(bad, ",")) end
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aE 'PARSERS_(OK|BAD)' | while read -r line; do
+  if [[ "$line" == PARSERS_OK* ]]; then say "treesitter parsers load (${line#PARSERS_OK })" "PASS"
+  else say "treesitter parsers load" "FAIL: $line"; fi
+done
+
+# 3. LSP attaches per language. Open a real file of each type headless, wait for
+#    the FileType/LspAttach cycle, and report the attached client.
+check_lsp() {
+  local ft="$1" ext="$2" want="$3"
+  local tmp="/tmp/pwnlsp.$ext"
+  case "$ext" in
+    c)  printf 'int main(void){return 0;}\n' > "$tmp" ;;
+    rs) printf 'fn main() {}\n' > "$tmp" ;;
+    py) printf 'x = 1\n' > "$tmp" ;;
+    lua) printf 'local x = 1\n' > "$tmp" ;;
+  esac
+  local got
+  got="$(nvim --headless "$tmp" -c 'lua
+    vim.wait(8000, function()
+      return #vim.lsp.get_clients({ bufnr = 0 }) > 0
+    end, 100)
+    local names = {}
+    for _, c in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do names[#names+1] = c.name end
+    print("LSP="..table.concat(names, ","))
+  ' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'LSP=[a-z_,-]*' | head -1)"
+  rm -f "$tmp"
+  got="${got#LSP=}"
+  if [[ ",$got," == *",$want,"* ]]; then say "LSP $ft -> $want" "PASS ($got)"
+  else say "LSP $ft -> $want" "FAIL (got: ${got:-none})"; fail=1; fi
+}
+check_lsp C        c   clangd
+check_lsp Python   py  ruff
+check_lsp Lua      lua lua_ls
+# Rust LSP: the dojo provides rust-analyzer/rustc/cargo only as rustup shims
+# with NO default toolchain installed, and no network to `rustup default`. So
+# rust-analyzer exits immediately and cannot attach. rust_analyzer is left
+# enabled (it will just work if a toolchain ever appears) and treesitter still
+# highlights Rust -- but LSP is genuinely unavailable, so this is SKIP not FAIL.
+if rust-analyzer --version >/dev/null 2>&1; then
+  check_lsp Rust rs rust_analyzer
+else
+  say "LSP Rust (no rust toolchain on dojo)" "SKIP"
+fi
+
+# 4. blink.cmp uses the compiled Rust fuzzy matcher, not the lua fallback.
+impl="$(nvim --headless -c 'lua
+  local ok, fuzzy = pcall(require, "blink.cmp.fuzzy")
+  local rok = ok and pcall(function() return require("blink.cmp.fuzzy.rust") end)
+  print("FUZZY="..(rok and "rust" or "lua"))
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'FUZZY=(rust|lua)' | head -1)"
+if [[ "$impl" == "FUZZY=rust" ]]; then say "blink.cmp fuzzy = rust" "PASS"
+else say "blink.cmp fuzzy = rust" "WARN (${impl:-unknown}; lua fallback works, just slower)"; fi
+
+# 5. Pwn tooling reachable on PATH.
+for t in gcc gdb checksec ROPgadget objdump python3; do
+  if command -v "$t" >/dev/null; then say "tool: $t" "PASS"; else say "tool: $t" "FAIL"; fail=1; fi
+done
+python3 -c 'import pwn' 2>/dev/null && say "python: import pwn (pwntools)" "PASS" || { say "python: pwntools" "FAIL"; fail=1; }
+
+# 6. asm parser + man section 2 (the two pwn-layer externals).
+nvim --headless -c 'lua print("ASM="..tostring(pcall(vim.treesitter.language.add,"asm")))' -c 'qa' </dev/null 2>&1 \
+  | tr -d '\033' | grep -aq 'ASM=true' && say "asm treesitter parser" "PASS" || say "asm treesitter parser" "FAIL"
+man 2 read >/dev/null 2>&1 && say "man 2 (syscall lookup)" "PASS" || say "man 2 (syscall lookup)" "FAIL"
+
+# 7. pwntools snippets actually register (LuaSnip's fmta is strict: one unused
+#    node arg silently aborts the whole add_snippets block).
+snip="$(nvim --headless -c 'lua
+  require("lazy").load({ plugins = { "LuaSnip" } })
+  vim.wait(800)
+  local snips = require("luasnip").get_snippets("python") or {}
+  local have = {}
+  for _, s in ipairs(snips) do have[s.trigger] = true end
+  local ok = have.pwn and have.rop and have.sla and have.p64 and have.gdba
+  print("SNIPPETS="..(ok and "ok" or "missing").." ("..#snips.." python)")
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'SNIPPETS=[a-z]+ \([0-9]+ python\)' | head -1)"
+if [[ "$snip" == SNIPPETS=ok* ]]; then say "pwntools snippets registered ${snip#SNIPPETS=ok }" "PASS"
+else say "pwntools snippets" "FAIL ($snip)"; fail=1; fi
+
+# 8. Build binding produces an unmitigated binary (no-PIE + exec stack).
+bdir="$(mktemp -d)"
+printf 'int main(void){return 0;}\n' > "$bdir/c.c"
+nvim --headless "$bdir/c.c" \
+  -c 'lua vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(" kb", true, false, true), "mx", false)' \
+  -c 'sleep 2' -c 'qa' </dev/null >/dev/null 2>&1
+if [[ -x "$bdir/c" ]] && readelf -lW "$bdir/c" 2>/dev/null | grep -q 'GNU_STACK.*RWE' \
+   && ! file "$bdir/c" | grep -q 'pie executable'; then
+  say "<leader>kb builds unmitigated binary (no-pie, execstack)" "PASS"
+else say "<leader>kb build flags" "FAIL"; fail=1; fi
+rm -rf "$bdir"
+
+echo "----------------------------------------------------------------------"
+[[ $fail -eq 0 ]] && echo "  RESULT: all hard checks passed" || echo "  RESULT: FAILURES above"
+exit $fail
+REMOTE
