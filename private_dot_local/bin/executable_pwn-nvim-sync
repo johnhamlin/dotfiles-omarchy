@@ -38,9 +38,30 @@ done
 CFG="$HOME/.config/nvim"
 DATA="$HOME/.local/share/nvim"
 MASON="$DATA/mason/packages"
-OVERRIDES="$HOME/notes/pwn-college-nvim/overrides"
+PROJECT="$HOME/notes/pwn-college-nvim"
+OVERRIDES="$PROJECT/overrides"
+PAYLOAD="$PROJECT/payload"          # gitignored; holds the ble.sh tree
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
+
+BLESH_URL="https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz"
+
+# Ensure the ble.sh payload exists locally (fetched once, then rsynced each run).
+ensure_blesh() {
+  [[ -r "$PAYLOAD/blesh/ble.sh" ]] && return 0
+  echo "==> fetching ble.sh payload (first run only)"
+  mkdir -p "$PAYLOAD"
+  local tmp; tmp="$(mktemp -d)"
+  if curl -fsSL -o "$tmp/ble.tar.xz" "$BLESH_URL" && tar xJf "$tmp/ble.tar.xz" -C "$tmp"; then
+    rm -rf "$PAYLOAD/blesh"
+    mv "$tmp/ble-nightly" "$PAYLOAD/blesh"
+    rm -rf "$tmp"
+    return 0
+  fi
+  rm -rf "$tmp"
+  echo "   warn: could not fetch ble.sh; bash will fall back to native readline" >&2
+  return 1
+}
 
 # rsync flags. -a preserves symlinks (site/queries/* are symlinks into lazy/,
 # which resolve on the dojo because we rsync to identical absolute paths).
@@ -122,7 +143,7 @@ EOF
 chmod +x ~/.local/bin/lua-language-server'
   fi
 
-  echo "==> [5/5] pushing tmux config -> $HOST:~/.config/tmux/tmux.conf"
+  echo "==> [5/6] pushing tmux config -> $HOST:~/.config/tmux/tmux.conf"
   # Self-contained single file, no TPM plugins. The dojo runs tmux 3.6a, newer
   # than every version-gated option in it (extended-keys, terminal-features,
   # allow-passthrough, swap-pane {left-of}), so it ships verbatim. The
@@ -134,6 +155,18 @@ chmod +x ~/.local/bin/lua-language-server'
   else
     echo "   warn: ~/.config/tmux/tmux.conf not found locally, skipping" >&2
   fi
+
+  echo "==> [6/6] pushing bash env (ble.sh + ~/.bashrc + ~/.inputrc)"
+  # bash stays the shell here (pwn.college is bash-centric); ble.sh + fzf +
+  # readline binds bring the fish interactive niceties without switching shells.
+  if ensure_blesh; then
+    "${RS[@]}" --delete "$PAYLOAD/blesh/" "$HOST:.local/share/blesh/"
+  fi
+  ssh "$HOST" 'mkdir -p ~/.config'
+  "${RS[@]}" "$OVERRIDES/bashrc"       "$HOST:.bashrc"
+  "${RS[@]}" "$OVERRIDES/inputrc"      "$HOST:.inputrc"
+  # A login shell (what `ssh pwn` starts) reads .bash_profile, NOT .bashrc.
+  "${RS[@]}" "$OVERRIDES/bash_profile" "$HOST:.bash_profile"
 
   if [[ ${#DRY[@]} -gt 0 ]]; then
     echo "==> dry run complete; skipping verification"
@@ -276,6 +309,32 @@ if command -v tmux >/dev/null; then
 else
   say "tmux (not on box)" "FAIL"; fail=1
 fi
+
+# 10. bash env. Two deterministic parts (live ble.sh TTY attach is proven but
+#     racy to capture, so verify the guarantees instead):
+#   a) the shipped ble.sh actually SOURCES and runs on the dojo's bash 5.3
+#      (drive a --norc bash under a pty, source it, read BLE_VERSION);
+#   b) the login-shell WIRING is connected: `ssh pwn` -> login shell ->
+#      .bash_profile -> .bashrc -> ble.sh + vi mode + autosuggestion opt.
+berr="$(bash -n ~/.bashrc 2>&1; bash -n ~/.bash_profile 2>&1; bash -n ~/.inputrc 2>/dev/null)"
+if [[ -n "$berr" ]]; then say "bash config syntax" "FAIL: $berr"; fail=1; fi
+
+src="$(script -qec 'bash --norc -i' /dev/null \
+        < <(printf 'source ~/.local/share/blesh/ble.sh --noattach; echo SRC=${BLE_VERSION:-FAIL}; exit\n') \
+        2>/dev/null | tr -d '\r' | grep -aoE 'SRC=[0-9][A-Za-z0-9.+~_-]*' | head -1)"
+if [[ -n "$src" ]]; then say "ble.sh runs on dojo bash (${src#SRC=})" "PASS"
+else say "ble.sh runs on dojo bash" "FAIL"; fail=1; fi
+
+wire_ok=1
+grep -q 'source ~/.bashrc\|\. ~/.bashrc\|source ~/\.bashrc' ~/.bash_profile || \
+  grep -q '~/.bashrc' ~/.bash_profile || wire_ok=0        # profile -> bashrc
+grep -q 'blesh/ble.sh' ~/.bashrc || wire_ok=0             # bashrc -> ble.sh
+grep -q 'set -o vi' ~/.bashrc || wire_ok=0                # vi mode
+grep -q 'complete_auto_complete=1' ~/.bashrc || wire_ok=0 # autosuggestion
+grep -q 'ble-attach' ~/.bashrc || wire_ok=0               # attaches
+[[ $wire_ok -eq 1 ]] && say "login chain wired (.bash_profile->.bashrc->ble.sh, vi, autosuggest)" "PASS" \
+  || { say "login chain wiring" "FAIL"; fail=1; }
+command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
 
 echo "----------------------------------------------------------------------"
 [[ $fail -eq 0 ]] && echo "  RESULT: all hard checks passed" || echo "  RESULT: FAILURES above"
