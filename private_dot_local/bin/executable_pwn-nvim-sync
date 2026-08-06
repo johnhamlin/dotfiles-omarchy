@@ -122,6 +122,19 @@ EOF
 chmod +x ~/.local/bin/lua-language-server'
   fi
 
+  echo "==> [5/5] pushing tmux config -> $HOST:~/.config/tmux/tmux.conf"
+  # Self-contained single file, no TPM plugins. The dojo runs tmux 3.6a, newer
+  # than every version-gated option in it (extended-keys, terminal-features,
+  # allow-passthrough, swap-pane {left-of}), so it ships verbatim. The
+  # @pane-is-vim smart-splits bindings pair with the deployed nvim; the fish
+  # kitty-passthrough helper is fish-only and simply inert under the dojo's bash.
+  if [[ -f "$HOME/.config/tmux/tmux.conf" ]]; then
+    ssh "$HOST" 'mkdir -p ~/.config/tmux'
+    "${RS[@]}" "$HOME/.config/tmux/tmux.conf" "$HOST:.config/tmux/tmux.conf"
+  else
+    echo "   warn: ~/.config/tmux/tmux.conf not found locally, skipping" >&2
+  fi
+
   if [[ ${#DRY[@]} -gt 0 ]]; then
     echo "==> dry run complete; skipping verification"
     exit 0
@@ -251,6 +264,18 @@ if [[ -x "$bdir/c" ]] && readelf -lW "$bdir/c" 2>/dev/null | grep -q 'GNU_STACK.
   say "<leader>kb builds unmitigated binary (no-pie, execstack)" "PASS"
 else say "<leader>kb build flags" "FAIL"; fail=1; fi
 rm -rf "$bdir"
+
+# 9. tmux sources its config with no parse errors (a bad option aborts sourcing
+#    at that line, silently dropping every binding below it). Use a throwaway
+#    server socket so this never touches a real session.
+if command -v tmux >/dev/null; then
+  terr="$(tmux -L pwnverify -f "$HOME/.config/tmux/tmux.conf" new-session -d -s v 'sleep 2' 2>&1)"
+  tmux -L pwnverify kill-server >/dev/null 2>&1
+  if [[ -z "$terr" ]]; then say "tmux config sources cleanly" "PASS"
+  else say "tmux config" "FAIL: $terr"; fail=1; fi
+else
+  say "tmux (not on box)" "FAIL"; fail=1
+fi
 
 echo "----------------------------------------------------------------------"
 [[ $fail -eq 0 ]] && echo "  RESULT: all hard checks passed" || echo "  RESULT: FAILURES above"
