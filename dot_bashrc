@@ -5,10 +5,19 @@
 # Not interactive? Do nothing (matches Omarchy's stock bashrc contract).
 [[ $- != *i* ]] && return
 
-if [[ $SHLVL -eq 1 && -x /usr/bin/fish ]] \
+# "Top-level" = SHLVL 1, OR any tmux pane shell. tmux hands the pane SHLVL=1
+# and bash increments it to 2 before this file runs, so the SHLVL test alone
+# never fires inside tmux — which left panes on bash, and bash never sources
+# fish/conf.d/kitty-is-tmux.fish, so kitty's ctrl+hjkl kept eating tmux's
+# pane-navigation keys. The PPID test below still stops a fish-spawned nested
+# bash from bouncing back into fish.
+if [[ ( $SHLVL -eq 1 || -n $TMUX ) && -x /usr/bin/fish ]] \
    && [[ "$(ps -o comm= -p $PPID 2>/dev/null)" != "fish" ]]; then
   exec /usr/bin/fish
 fi
 
 # Non-fish interactive path (nested bash): Omarchy's bash setup
 [[ -f ~/.local/share/omarchy/default/bash/rc ]] && source ~/.local/share/omarchy/default/bash/rc
+
+# Pi
+export PATH="/home/john/.local/share/mise/installs/node/24.14.1/bin:$PATH"
