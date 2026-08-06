@@ -339,6 +339,27 @@ grep -q 'ble-attach' ~/.bashrc || wire_ok=0               # attaches
   || { say "login chain wiring" "FAIL"; fail=1; }
 command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
 
+# 10b. No ble-bind errors on a REAL login (catches binding lazily-defined
+#      widgets too early / wrong keymap -> "Unknown widget" nag every login).
+#      Force-load ble.sh's `complete` module, then replay the exact auto_complete
+#      binds from ~/.bashrc; any bad widget name errors here, deterministically.
+{
+  echo 'source ~/.local/share/blesh/ble.sh --noattach'
+  echo 'ble-import -f lib/core-complete 2>/dev/null'
+  grep -oE 'ble-bind -m auto_complete -f "[^"]+" "[^"]+"' ~/.bashrc
+  echo 'echo BINDPROBE_DONE'
+  echo 'exit'
+} > /tmp/pwn-bindprobe.txt
+bind_out="$(script -qec 'bash --norc -i' /dev/null < /tmp/pwn-bindprobe.txt 2>&1 | tr -d '\r')"
+rm -f /tmp/pwn-bindprobe.txt
+if grep -qiE 'Unknown widget|ble-bind:.*error' <<<"$bind_out"; then
+  say "ble.sh accept-key binds valid" "FAIL: $(grep -iE 'Unknown widget|ble-bind' <<<"$bind_out" | head -1)"; fail=1
+elif grep -q 'BINDPROBE_DONE' <<<"$bind_out"; then
+  say "ble.sh accept-key binds valid (Ctrl-Y accept)" "PASS"
+else
+  say "ble.sh accept-key binds" "CHECK (probe inconclusive)"
+fi
+
 # 11. starship prompt actually renders the hostname (the loaded challenge) and
 #     NOT the [Docker] container label.
 if command -v starship >/dev/null; then
