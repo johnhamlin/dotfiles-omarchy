@@ -63,8 +63,14 @@ ensure_blesh() {
   return 1
 }
 
-# rsync flags. -a preserves symlinks (site/queries/* are symlinks into lazy/,
-# which resolve on the dojo because we rsync to identical absolute paths).
+# rsync flags. -a preserves symlinks as-is. That is WRONG for site/queries/*:
+# nvim-treesitter (main branch) installs each language's queries as a symlink
+# site/queries/<lang> -> $HOME/.local/share/nvim/lazy/nvim-treesitter/runtime/
+# queries/<lang>, i.e. an ABSOLUTE path under /home/john. The dojo home is
+# /home/hacker, so a verbatim copy dangles -> highlights.scm is off the rtp ->
+# the parser loads but paints nothing (Python et al. show as plain text; C/Lua
+# survive only because Neovim bundles those queries in $VIMRUNTIME). The queries
+# push below uses --copy-links to land them as real files, path-independent.
 RS=(rsync -a --info=stats1 "${DRY[@]}")
 
 # Plugin spec files that make no sense offline / on the dojo and are excluded
@@ -119,7 +125,10 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
 
   echo "==> [3/4] pushing treesitter parsers + queries"
   "${RS[@]}" "$DATA/site/parser"  "$HOST:.local/share/nvim/site/"
-  "${RS[@]}" "$DATA/site/queries" "$HOST:.local/share/nvim/site/"
+  # --copy-links: dereference the per-language query symlinks into real files so
+  # they don't dangle under the dojo's /home/hacker (see RS comment above).
+  # --delete so a stale dangling symlink from an earlier sync is replaced.
+  "${RS[@]}" --copy-links --delete "$DATA/site/queries" "$HOST:.local/share/nvim/site/"
 
   echo "==> [4/4] pushing LSP servers / formatters -> $HOST:~/.local/bin"
   # Direct single-file ELF binaries: ship the resolved real file.
@@ -214,6 +223,24 @@ nvim --headless -c 'lua
 ' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aE 'PARSERS_(OK|BAD)' | while read -r line; do
   if [[ "$line" == PARSERS_OK* ]]; then say "treesitter parsers load (${line#PARSERS_OK })" "PASS"
   else say "treesitter parsers load" "FAIL: $line"; fi
+done
+
+# 2b. Highlight QUERIES resolve. A parser can load fine yet paint nothing if its
+#     highlights.scm is off the runtimepath -- exactly what happened when the
+#     site/queries/<lang> symlinks were copied verbatim and dangled under
+#     /home/hacker. Neovim-bundled langs (c/lua/...) have a $VIMRUNTIME fallback
+#     and would mask the failure, so probe langs that ONLY nvim-treesitter ships.
+nvim --headless -c 'lua
+  local want = {"python","rust","go","bash","asm"}
+  local bad = {}
+  for _, l in ipairs(want) do
+    if not vim.treesitter.query.get(l, "highlights") then table.insert(bad, l) end
+  end
+  if #bad == 0 then print(("QUERIES_OK %d"):format(#want))
+  else print("QUERIES_BAD "..table.concat(bad, ",")) end
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aE 'QUERIES_(OK|BAD)' | while read -r line; do
+  if [[ "$line" == QUERIES_OK* ]]; then say "treesitter highlight queries resolve (${line#QUERIES_OK })" "PASS"
+  else say "treesitter highlight queries resolve" "FAIL: missing ${line#QUERIES_BAD }"; fi
 done
 
 # 3. LSP attaches per language. Open a real file of each type headless, wait for
