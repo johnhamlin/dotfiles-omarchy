@@ -9,7 +9,10 @@
 # What gets pushed:
 #   ~/.config/nvim                      -> pwn:~/.config/nvim   (minus dropped
 #                                          plugin specs, plus override layer)
-#   ~/.local/share/nvim/lazy            -> pwn:  (all plugins, pre-cloned)
+#   ~/.local/share/nvim/lazy            -> pwn:  (all plugins, pre-cloned;
+#                                          0.12-only plugins are then replaced
+#                                          by their compat branch, see
+#                                          PLUGIN_COMPAT below)
 #   ~/.local/share/nvim/site/{parser,queries} -> pwn:  (compiled TS parsers)
 #   selected mason binaries            -> pwn:~/.local/bin + ~/.local/share
 #
@@ -73,6 +76,72 @@ CONFIG_EXCLUDES=(
   --exclude '.gitignore'
 )
 
+# ---------------------------------------------------------------------------
+# Compat pins: plugins whose upstream main branch has gone Neovim-0.12-only.
+#
+# This desktop runs nvim 0.12.x; the dojo runs 0.11.5 and cannot be upgraded
+# (no network, no build tools). The plugin push below is a verbatim mirror of
+# this machine's lazy tree, so a 0.12-only plugin lands on the dojo and refuses
+# to run there. aerial.nvim is the live case: lua/aerial/init.lua bails out of
+# M.setup() when has("nvim-0.12") == 0, after notifying
+#   "aerial is deprecated for Neovim <0.12. Please use a nvim-0.x branch"
+# and -- because the return happens *before* create_commands() -- :AerialToggle
+# never exists at all. LazyVim's extra loads it on `LazyFile`, so the error
+# fires on every launch that opens a file.
+#
+# Fix: leave the desktop on master, and ship upstream's compat BRANCH to the
+# dojo only. Each entry is "<lazy plugin dir>=<branch>". The upstream URL is
+# read from the installed plugin's own origin; the checkout is cached under
+# ~/.cache/pwn-nvim/compat so reruns are cheap and a network blip is survivable.
+PLUGIN_COMPAT=(
+  "aerial.nvim=nvim-0.11"
+)
+COMPAT_CACHE="$HOME/.cache/pwn-nvim/compat"
+
+# Stage each compat branch locally, then rsync it OVER the copy the plugin push
+# just placed (hence: must run after it), with --delete so master-only files go.
+push_compat_plugins() {
+  local entry name branch url dir
+  for entry in "${PLUGIN_COMPAT[@]}"; do
+    name="${entry%%=*}"
+    branch="${entry#*=}"
+    dir="$COMPAT_CACHE/$name"
+
+    if [[ ! -d "$DATA/lazy/$name" ]]; then
+      echo "   warn: $name not installed locally, skipping compat pin" >&2
+      continue
+    fi
+
+    if [[ ${#DRY[@]} -eq 0 ]]; then
+      if [[ -d "$dir/.git" ]]; then
+        if ! git -C "$dir" fetch --depth 1 --quiet origin "$branch" \
+           || ! git -C "$dir" checkout --quiet -B "$branch" FETCH_HEAD; then
+          echo "   warn: could not refresh $name#$branch, using cached checkout" >&2
+        fi
+      else
+        url="$(git -C "$DATA/lazy/$name" remote get-url origin 2>/dev/null || true)"
+        if [[ -z "$url" ]]; then
+          echo "   warn: no origin URL for $name, skipping compat pin" >&2
+          continue
+        fi
+        mkdir -p "$COMPAT_CACHE"
+        if ! git clone --quiet --depth 1 --branch "$branch" "$url" "$dir"; then
+          echo "   warn: clone of $name#$branch failed, skipping compat pin" >&2
+          rm -rf "$dir"
+          continue
+        fi
+      fi
+    fi
+
+    if [[ ! -d "$dir" ]]; then
+      echo "   warn: no staged checkout for $name#$branch (dry run?), skipping" >&2
+      continue
+    fi
+    echo "   pinning $name -> $branch ($(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo '?'))"
+    "${RS[@]}" --delete "$dir/" "$HOST:.local/share/nvim/lazy/$name/"
+  done
+}
+
 require_override() {
   [[ -f "$1" ]] || { echo "missing override source: $1" >&2; exit 1; }
 }
@@ -97,23 +166,26 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
   cp "$OVERRIDES/lua/plugins/zz-pwn.lua"         "$STAGE/lua/plugins/zz-pwn.lua"
   cp "$OVERRIDES/lazyvim.json"                   "$STAGE/lazyvim.json"
 
-  echo "==> [1/4] pushing config  ->  $HOST:~/.config/nvim"
+  echo "==> [1/7] pushing config  ->  $HOST:~/.config/nvim"
   ssh "$HOST" 'mkdir -p ~/.config/nvim ~/.local/share/nvim/site ~/.local/bin ~/.local/share'
   "${RS[@]}" --delete \
     --exclude 'lua/plugins/zz-pwn-local.lua' \
     "$STAGE/" "$HOST:.config/nvim/"
 
-  echo "==> [2/4] pushing plugins ->  $HOST:~/.local/share/nvim/lazy  (~284M, first run only)"
+  echo "==> [2/7] pushing plugins ->  $HOST:~/.local/share/nvim/lazy  (~284M, first run only)"
   "${RS[@]}" "$DATA/lazy/" "$HOST:.local/share/nvim/lazy/"
 
-  echo "==> [3/4] pushing treesitter parsers + queries"
+  echo "==> [3/7] pinning 0.12-only plugins to their compat branches"
+  push_compat_plugins
+
+  echo "==> [4/7] pushing treesitter parsers + queries"
   "${RS[@]}" "$DATA/site/parser"  "$HOST:.local/share/nvim/site/"
   # --copy-links: dereference the per-language query symlinks into real files so
   # they don't dangle under the dojo's /home/hacker (see RS comment above).
   # --delete so a stale dangling symlink from an earlier sync is replaced.
   "${RS[@]}" --copy-links --delete "$DATA/site/queries" "$HOST:.local/share/nvim/site/"
 
-  echo "==> [4/4] pushing LSP servers / formatters -> $HOST:~/.local/bin"
+  echo "==> [5/7] pushing LSP servers / formatters -> $HOST:~/.local/bin"
   # Direct single-file ELF binaries: ship the resolved real file.
   for name in stylua shellcheck shfmt; do
     real="$(readlink -f "$DATA/mason/bin/$name" 2>/dev/null || true)"
@@ -135,7 +207,7 @@ EOF
 chmod +x ~/.local/bin/lua-language-server'
   fi
 
-  echo "==> [5/6] pushing tmux config -> $HOST:~/.config/tmux/tmux.conf"
+  echo "==> [6/7] pushing tmux config -> $HOST:~/.config/tmux/tmux.conf"
   # Self-contained single file, no TPM plugins. The dojo runs tmux 3.6a, newer
   # than every version-gated option in it (extended-keys, terminal-features,
   # allow-passthrough, swap-pane {left-of}), so it ships verbatim. The
@@ -148,7 +220,7 @@ chmod +x ~/.local/bin/lua-language-server'
     echo "   warn: ~/.config/tmux/tmux.conf not found locally, skipping" >&2
   fi
 
-  echo "==> [6/6] pushing bash env (~/.bashrc + ~/.inputrc + prompt)"
+  echo "==> [7/7] pushing bash env (~/.bashrc + ~/.inputrc + prompt)"
   # bash stays the shell here (pwn.college is bash-centric). Interactive polish
   # is NATIVE readline (vi mode + prefix history search + menu completion in
   # ~/.inputrc) plus fzf/zoxide/starship. ble.sh was removed 2026-08-08 -- see
@@ -238,6 +310,19 @@ nvim --headless -c 'lua
   if [[ "$line" == QUERIES_OK* ]]; then say "treesitter highlight queries resolve (${line#QUERIES_OK })" "PASS"
   else say "treesitter highlight queries resolve" "FAIL: missing ${line#QUERIES_BAD }"; fi
 done
+
+# 2c. Plugins pinned to a compat branch must actually initialise on 0.11.
+#     aerial's master went 0.12-only: setup() notifies "aerial is deprecated for
+#     Neovim <0.12" and returns BEFORE create_commands(), so the decisive tell
+#     is that :AerialToggle doesn't exist. Checking the command (not the notify)
+#     also catches a compat branch that got clobbered by a later plain rsync.
+aer="$(nvim --headless -c 'lua
+  pcall(function() require("lazy").load({ plugins = { "aerial.nvim" } }) end)
+  vim.wait(500)
+  print("AERIAL="..(vim.fn.exists(":AerialToggle") == 2 and "ok" or "dead"))
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'AERIAL=(ok|dead)' | head -1)"
+if [[ "$aer" == "AERIAL=ok" ]]; then say "aerial initialises (:AerialToggle present)" "PASS"
+else say "aerial" "FAIL: setup bailed -- 0.12-only branch on the box?"; fail=1; fi
 
 # 3. LSP attaches per language. Open a real file of each type headless, wait for
 #    the FileType/LspAttach cycle, and report the attached client.
