@@ -155,6 +155,14 @@ chmod +x ~/.local/bin/lua-language-server'
   # the header of overrides/bashrc and dead end #8 in the README.
   ssh "$HOST" 'rm -rf ~/.local/share/blesh'   # remove a previously-synced ble.sh
   ssh "$HOST" 'mkdir -p ~/.config'
+  # bash-completion: pure shell (no ELF), so it transplants offline. The dojo
+  # ships none, which is why bare bash there only completes filenames.
+  if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+    "${RS[@]}" --delete /usr/share/bash-completion/ \
+      "$HOST:.local/share/bash-completion/"
+  else
+    echo "   warn: /usr/share/bash-completion not found locally, skipping" >&2
+  fi
   "${RS[@]}" "$OVERRIDES/bashrc"       "$HOST:.bashrc"
   "${RS[@]}" "$OVERRIDES/inputrc"      "$HOST:.inputrc"
   # A login shell (what `ssh pwn` starts) reads .bash_profile, NOT .bashrc.
@@ -341,6 +349,17 @@ grep -q '__heal_kbd_protocol' ~/.bashrc || wire_ok=0        # CSI-u leak heal
 grep -q 'starship init bash' ~/.bashrc || wire_ok=0         # prompt
 [[ $wire_ok -eq 1 ]] && say "login chain wired (.bash_profile->.bashrc, vi, kbd-heal, prompt)" "PASS" \
   || { say "login chain wiring" "FAIL"; fail=1; }
+
+# vi mode indicator (native readline; replaces ble.sh's mode display).
+if bash -ic 'bind -v' 2>/dev/null | grep -qa 'show-mode-in-prompt on'; then
+  say "vi mode indicator in prompt (I/N + cursor shape)" "PASS"
+else say "vi mode indicator" "FAIL: show-mode-in-prompt not on"; fail=1; fi
+
+# bash-completion: the dojo ships none, so this is rsynced. Prove it LOADED (the
+# lazy loader function exists) rather than just that the files are present.
+if bash -ic 'type -t _comp_load || type -t _completion_loader' 2>/dev/null | grep -qa function; then
+  say "bash-completion loaded (programmable completions)" "PASS"
+else say "bash-completion" "FAIL: not loaded"; fail=1; fi
 command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
 
 # 10b. readline really loaded ~/.inputrc: ask bash to dump its binds and confirm
