@@ -170,6 +170,11 @@ chmod +x ~/.local/bin/lua-language-server'
   # starship prompt: default config path is ~/.config/starship.toml (no env var
   # needed). Leads with the hostname = the loaded challenge.
   "${RS[@]}" "$OVERRIDES/starship.toml" "$HOST:.config/starship.toml"
+  # pwntools: gdb.attach() opens pwndbg in a tmux split (dojo ships neither file).
+  "${RS[@]}" "$OVERRIDES/pwn.conf"      "$HOST:.pwn.conf"
+  # gdb: persistent history + intel syntax. pwndbg is a separate binary and is
+  # NOT wired through ~/.gdbinit, so this cannot break it (verified).
+  "${RS[@]}" "$OVERRIDES/gdbinit"       "$HOST:.gdbinit"
 
   if [[ ${#DRY[@]} -gt 0 ]]; then
     echo "==> dry run complete; skipping verification"
@@ -360,6 +365,19 @@ else say "vi mode indicator" "FAIL: show-mode-in-prompt not on"; fail=1; fi
 if bash -ic 'type -t _comp_load || type -t _completion_loader' 2>/dev/null | grep -qa function; then
   say "bash-completion loaded (programmable completions)" "PASS"
 else say "bash-completion" "FAIL: not loaded"; fail=1; fi
+
+# pwntools: gdb.attach() needs context.terminal, and the value must survive
+# pwnlib's safeeval (a bare `tmux, splitw, -h` raises "opcode LOAD_NAME not
+# allowed"), so assert the PARSED value, not just that the file exists.
+if python3 -c 'from pwn import context; import sys; sys.exit(0 if context.terminal[:2]==["tmux","splitw"] else 1)' 2>/dev/null; then
+  say "pwntools context.terminal (gdb.attach -> tmux split)" "PASS"
+else say "pwntools context.terminal" "FAIL: ~/.pwn.conf not parsed"; fail=1; fi
+
+# gdb: persistent history + intel syntax, and pwndbg must still start.
+if gdb -batch -ex 'show history save' -ex 'show disassembly-flavor' 2>/dev/null \
+     | grep -qa 'history record on exit is on'; then
+  say "gdb history persists + intel syntax" "PASS"
+else say "gdb ~/.gdbinit" "FAIL"; fail=1; fi
 command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
 
 # 10b. readline really loaded ~/.inputrc: ask bash to dump its binds and confirm
