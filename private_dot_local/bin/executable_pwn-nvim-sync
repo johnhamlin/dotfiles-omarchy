@@ -40,28 +40,11 @@ DATA="$HOME/.local/share/nvim"
 MASON="$DATA/mason/packages"
 PROJECT="$HOME/notes/pwn-college-nvim"
 OVERRIDES="$PROJECT/overrides"
-PAYLOAD="$PROJECT/payload"          # gitignored; holds the ble.sh tree
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-BLESH_URL="https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz"
-
-# Ensure the ble.sh payload exists locally (fetched once, then rsynced each run).
-ensure_blesh() {
-  [[ -r "$PAYLOAD/blesh/ble.sh" ]] && return 0
-  echo "==> fetching ble.sh payload (first run only)"
-  mkdir -p "$PAYLOAD"
-  local tmp; tmp="$(mktemp -d)"
-  if curl -fsSL -o "$tmp/ble.tar.xz" "$BLESH_URL" && tar xJf "$tmp/ble.tar.xz" -C "$tmp"; then
-    rm -rf "$PAYLOAD/blesh"
-    mv "$tmp/ble-nightly" "$PAYLOAD/blesh"
-    rm -rf "$tmp"
-    return 0
-  fi
-  rm -rf "$tmp"
-  echo "   warn: could not fetch ble.sh; bash will fall back to native readline" >&2
-  return 1
-}
+# NOTE: there is no longer a `payload/` (it held ble.sh, dropped 2026-08-08) and
+# no network fetch of any kind -- everything shipped now comes from this machine.
 
 # rsync flags. -a preserves symlinks as-is. That is WRONG for site/queries/*:
 # nvim-treesitter (main branch) installs each language's queries as a symlink
@@ -165,12 +148,12 @@ chmod +x ~/.local/bin/lua-language-server'
     echo "   warn: ~/.config/tmux/tmux.conf not found locally, skipping" >&2
   fi
 
-  echo "==> [6/6] pushing bash env (ble.sh + ~/.bashrc + ~/.inputrc)"
-  # bash stays the shell here (pwn.college is bash-centric); ble.sh + fzf +
-  # readline binds bring the fish interactive niceties without switching shells.
-  if ensure_blesh; then
-    "${RS[@]}" --delete "$PAYLOAD/blesh/" "$HOST:.local/share/blesh/"
-  fi
+  echo "==> [6/6] pushing bash env (~/.bashrc + ~/.inputrc + prompt)"
+  # bash stays the shell here (pwn.college is bash-centric). Interactive polish
+  # is NATIVE readline (vi mode + prefix history search + menu completion in
+  # ~/.inputrc) plus fzf/zoxide/starship. ble.sh was removed 2026-08-08 -- see
+  # the header of overrides/bashrc and dead end #8 in the README.
+  ssh "$HOST" 'rm -rf ~/.local/share/blesh'   # remove a previously-synced ble.sh
   ssh "$HOST" 'mkdir -p ~/.config'
   "${RS[@]}" "$OVERRIDES/bashrc"       "$HOST:.bashrc"
   "${RS[@]}" "$OVERRIDES/inputrc"      "$HOST:.inputrc"
@@ -340,51 +323,42 @@ else
   say "tmux (not on box)" "FAIL"; fail=1
 fi
 
-# 10. bash env. Two deterministic parts (live ble.sh TTY attach is proven but
-#     racy to capture, so verify the guarantees instead):
-#   a) the shipped ble.sh actually SOURCES and runs on the dojo's bash 5.3
-#      (drive a --norc bash under a pty, source it, read BLE_VERSION);
+# 10. bash env. ble.sh was removed 2026-08-08 (README dead end #8), so this now
+#     verifies the NATIVE readline setup instead:
+#   a) the rc files parse;
 #   b) the login-shell WIRING is connected: `ssh pwn` -> login shell ->
-#      .bash_profile -> .bashrc -> ble.sh + vi mode + autosuggestion opt.
-berr="$(bash -n ~/.bashrc 2>&1; bash -n ~/.bash_profile 2>&1; bash -n ~/.inputrc 2>/dev/null)"
-if [[ -n "$berr" ]]; then say "bash config syntax" "FAIL: $berr"; fail=1; fi
-
-src="$(script -qec 'bash --norc -i' /dev/null \
-        < <(printf 'source ~/.local/share/blesh/ble.sh --noattach; echo SRC=${BLE_VERSION:-FAIL}; exit\n') \
-        2>/dev/null | tr -d '\r' | grep -aoE 'SRC=[0-9][A-Za-z0-9.+~_-]*' | head -1)"
-if [[ -n "$src" ]]; then say "ble.sh runs on dojo bash (${src#SRC=})" "PASS"
-else say "ble.sh runs on dojo bash" "FAIL"; fail=1; fi
+#      .bash_profile -> .bashrc -> vi mode + prompt + protocol heal;
+#   c) readline actually has the vi-mode binds from ~/.inputrc;
+#   d) no ble.sh remnants are left on the box.
+berr="$(bash -n ~/.bashrc 2>&1; bash -n ~/.bash_profile 2>&1)"
+if [[ -n "$berr" ]]; then say "bash config syntax" "FAIL: $berr"; fail=1
+else say "bash config syntax" "PASS"; fi
 
 wire_ok=1
-grep -q 'source ~/.bashrc\|\. ~/.bashrc\|source ~/\.bashrc' ~/.bash_profile || \
-  grep -q '~/.bashrc' ~/.bash_profile || wire_ok=0        # profile -> bashrc
-grep -q 'blesh/ble.sh' ~/.bashrc || wire_ok=0             # bashrc -> ble.sh
-grep -q 'set -o vi' ~/.bashrc || wire_ok=0                # vi mode
-grep -q 'complete_auto_complete=1' ~/.bashrc || wire_ok=0 # autosuggestion
-grep -q 'ble-attach' ~/.bashrc || wire_ok=0               # attaches
-[[ $wire_ok -eq 1 ]] && say "login chain wired (.bash_profile->.bashrc->ble.sh, vi, autosuggest)" "PASS" \
+grep -q '~/.bashrc' ~/.bash_profile || wire_ok=0            # profile -> bashrc
+grep -q 'set -o vi' ~/.bashrc || wire_ok=0                  # vi mode
+grep -q '__heal_kbd_protocol' ~/.bashrc || wire_ok=0        # CSI-u leak heal
+grep -q 'starship init bash' ~/.bashrc || wire_ok=0         # prompt
+[[ $wire_ok -eq 1 ]] && say "login chain wired (.bash_profile->.bashrc, vi, kbd-heal, prompt)" "PASS" \
   || { say "login chain wiring" "FAIL"; fail=1; }
 command -v fzf >/dev/null && say "fzf present (C-r fuzzy history)" "PASS" || { say "fzf" "FAIL"; fail=1; }
 
-# 10b. No ble-bind errors on a REAL login (catches binding lazily-defined
-#      widgets too early / wrong keymap -> "Unknown widget" nag every login).
-#      Force-load ble.sh's `complete` module, then replay the exact auto_complete
-#      binds from ~/.bashrc; any bad widget name errors here, deterministically.
-{
-  echo 'source ~/.local/share/blesh/ble.sh --noattach'
-  echo 'ble-import -f lib/core-complete 2>/dev/null'
-  grep -oE 'ble-bind -m auto_complete -f "[^"]+" "[^"]+"' ~/.bashrc
-  echo 'echo BINDPROBE_DONE'
-  echo 'exit'
-} > /tmp/pwn-bindprobe.txt
-bind_out="$(script -qec 'bash --norc -i' /dev/null < /tmp/pwn-bindprobe.txt 2>&1 | tr -d '\r')"
-rm -f /tmp/pwn-bindprobe.txt
-if grep -qiE 'Unknown widget|ble-bind:.*error' <<<"$bind_out"; then
-  say "ble.sh accept-key binds valid" "FAIL: $(grep -iE 'Unknown widget|ble-bind' <<<"$bind_out" | head -1)"; fail=1
-elif grep -q 'BINDPROBE_DONE' <<<"$bind_out"; then
-  say "ble.sh accept-key binds valid (Ctrl-Y accept)" "PASS"
+# 10b. readline really loaded ~/.inputrc: ask bash to dump its binds and confirm
+#      the vi-insert prefix-history-search binding is actually live. This is the
+#      thing ble.sh used to provide, so it must not silently go missing.
+rl="$(bash -ic 'bind -m vi-insert -p 2>/dev/null' 2>/dev/null | grep -aE '^"\\C-p"' || true)"
+if grep -q 'history-search-backward' <<<"$rl"; then
+  say "readline vi-mode binds live (C-p prefix history search)" "PASS"
 else
-  say "ble.sh accept-key binds" "CHECK (probe inconclusive)"
+  say "readline vi-mode binds" "FAIL: C-p not bound to history-search-backward"; fail=1
+fi
+
+# 10c. ble.sh must be gone -- a stale tree would still be sourced by an old
+#      .bashrc and reintroduce the CSI-u/fzf and Ctrl-C problems.
+if [[ -e ~/.local/share/blesh ]] || grep -q 'blesh/ble.sh' ~/.bashrc 2>/dev/null; then
+  say "ble.sh fully removed" "FAIL: remnants present"; fail=1
+else
+  say "ble.sh fully removed" "PASS"
 fi
 
 # 11. starship prompt actually renders the hostname (the loaded challenge) and
