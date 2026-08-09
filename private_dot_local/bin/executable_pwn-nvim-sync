@@ -15,6 +15,8 @@
 #                                          PLUGIN_COMPAT below)
 #   ~/.local/share/nvim/site/{parser,queries} -> pwn:  (compiled TS parsers)
 #   selected mason binaries            -> pwn:~/.local/bin + ~/.local/share
+#   asm-lsp + its global .asm-lsp.toml -> pwn:~/.local/bin + ~/.config/asm-lsp
+#                                          (vendored release, not from mason)
 #
 # Idempotent. Safe to re-run whenever the local config changes. The override
 # sources live in ~/notes/pwn-college-nvim/overrides and are the source of
@@ -46,8 +48,53 @@ OVERRIDES="$PROJECT/overrides"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-# NOTE: there is no longer a `payload/` (it held ble.sh, dropped 2026-08-08) and
-# no network fetch of any kind -- everything shipped now comes from this machine.
+# payload/ holds the one thing this desktop cannot produce itself: the asm-lsp
+# release binary (see stage_asm_lsp). It is git-ignored, fetched at most once,
+# and reused offline thereafter -- every other byte shipped comes from this
+# machine's own nvim install.
+
+# asm-lsp -- the assembly language server (instruction docs, completion,
+# assembler diagnostics). Mason lists it, but only as `pkg:cargo/asm-lsp`, and
+# there is no rust toolchain on this desktop to build it with -- so the upstream
+# release binary is vendored instead, pinned by version AND sha256 (the digest
+# GitHub publishes for the asset).
+#
+# Upstream builds it against glibc 2.39 and the dojo is Ubuntu 24.04 / glibc
+# 2.39 exactly, so it runs there unmodified -- but that is the floor, not
+# headroom. If a future release fails to start on the dojo, check that first:
+#   objdump -T asm-lsp | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
+ASM_LSP_VERSION=0.10.1
+ASM_LSP_SHA256=2a2f386c10348e365df484d5c66d084813e7dbf8ab4e9eb7a7cc0bb0acf2f8f8
+ASM_LSP_URL="https://github.com/bergercookie/asm-lsp/releases/download/v${ASM_LSP_VERSION}/asm-lsp-x86_64-unknown-linux-gnu.tar.gz"
+ASM_LSP_BIN="$PROJECT/payload/asm-lsp/asm-lsp-$ASM_LSP_VERSION"
+
+# Fetch + verify asm-lsp into payload/, unless it is already there. Returns
+# non-zero (without killing the run) if it cannot be staged -- assembly LSP is
+# an enhancement, not a prerequisite for the rest of the environment.
+stage_asm_lsp() {
+  [[ -x "$ASM_LSP_BIN" ]] && return 0
+  [[ ${#DRY[@]} -gt 0 ]] && { echo "   (dry run) would fetch asm-lsp $ASM_LSP_VERSION"; return 1; }
+
+  local tmp
+  tmp="$(mktemp -d)"
+  echo "   fetching asm-lsp $ASM_LSP_VERSION (one time, then cached in payload/)"
+  if ! curl -fsSL --retry 2 -o "$tmp/asm-lsp.tar.gz" "$ASM_LSP_URL"; then
+    echo "   warn: could not download asm-lsp, skipping assembly LSP" >&2
+    rm -rf "$tmp"; return 1
+  fi
+  if ! echo "$ASM_LSP_SHA256  $tmp/asm-lsp.tar.gz" | sha256sum -c --quiet -; then
+    echo "   warn: asm-lsp sha256 MISMATCH -- refusing to ship it" >&2
+    rm -rf "$tmp"; return 1
+  fi
+  if ! tar xzf "$tmp/asm-lsp.tar.gz" -C "$tmp" || [[ ! -f "$tmp/asm-lsp" ]]; then
+    echo "   warn: unexpected asm-lsp archive layout, skipping" >&2
+    rm -rf "$tmp"; return 1
+  fi
+  mkdir -p "$(dirname "$ASM_LSP_BIN")"
+  install -m 755 "$tmp/asm-lsp" "$ASM_LSP_BIN"
+  rm -rf "$tmp"
+  return 0
+}
 
 # rsync flags. -a preserves symlinks as-is. That is WRONG for site/queries/*:
 # nvim-treesitter (main branch) installs each language's queries as a symlink
@@ -195,6 +242,17 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
       echo "   warn: $name not found locally, skipping" >&2
     fi
   done
+  # asm-lsp: vendored release binary (not a mason package -- see stage_asm_lsp)
+  # plus its global settings file. The settings must be global: challenge dirs
+  # are not git repos and do not persist, so there is nowhere to keep a
+  # project-local .asm-lsp.toml.
+  if stage_asm_lsp; then
+    "${RS[@]}" "$ASM_LSP_BIN" "$HOST:.local/bin/asm-lsp"
+    require_override "$OVERRIDES/asm-lsp.toml"
+    ssh "$HOST" 'mkdir -p ~/.config/asm-lsp'
+    "${RS[@]}" "$OVERRIDES/asm-lsp.toml" "$HOST:.config/asm-lsp/.asm-lsp.toml"
+  fi
+
   # lua-language-server: ships as a package tree + a regenerated wrapper,
   # because the mason wrapper hardcodes the local /home/john path.
   if [[ -d "$MASON/lua-language-server/libexec" ]]; then
@@ -334,6 +392,7 @@ check_lsp() {
     rs) printf 'fn main() {}\n' > "$tmp" ;;
     py) printf 'x = 1\n' > "$tmp" ;;
     lua) printf 'local x = 1\n' > "$tmp" ;;
+    s)  printf '.intel_syntax noprefix\n.global _start\n_start:\nmov rax, 60\nsyscall\n' > "$tmp" ;;
   esac
   local got
   got="$(nvim --headless "$tmp" -c 'lua
@@ -352,6 +411,9 @@ check_lsp() {
 check_lsp C        c   clangd
 check_lsp Python   py  ruff
 check_lsp Lua      lua lua_ls
+# Assembly. Note this attaches with root_dir = nil -- no .git, no .asm-lsp.toml
+# in a challenge dir -- which is the intended arrangement, not a degraded one.
+check_lsp Assembly s   asm_lsp
 # Rust LSP: the dojo provides rust-analyzer/rustc/cargo only as rustup shims
 # with NO default toolchain installed, and no network to `rustup default`. So
 # rust-analyzer exits immediately and cannot attach. rust_analyzer is left
@@ -381,6 +443,41 @@ python3 -c 'import pwn' 2>/dev/null && say "python: import pwn (pwntools)" "PASS
 # 6. asm parser + man section 2 (the two pwn-layer externals).
 nvim --headless -c 'lua print("ASM="..tostring(pcall(vim.treesitter.language.add,"asm")))' -c 'qa' </dev/null 2>&1 \
   | tr -d '\033' | grep -aq 'ASM=true' && say "asm treesitter parser" "PASS" || say "asm treesitter parser" "FAIL"
+
+# 6b. ...and that the parser is actually WIRED to both assembly filetypes. The
+#     parser loading says nothing about a .asm buffer using it: `nasm` is a
+#     separate filetype with no parser of its own, so it needs the explicit
+#     language.register in zz-pwn.lua. Open one of each and confirm a live
+#     treesitter highlighter, which is the thing that actually paints.
+printf '.intel_syntax noprefix\n_start:\nmov rax, 60\n' > /tmp/pwnts.s
+printf 'global _start\n_start:\nmov rax, 60\n' > /tmp/pwnts.asm
+tsattach="$(nvim --headless -c 'lua
+  local out = {}
+  for _, f in ipairs({ "/tmp/pwnts.s", "/tmp/pwnts.asm" }) do
+    vim.cmd("edit " .. f)
+    vim.wait(300)
+    local buf = vim.api.nvim_get_current_buf()
+    local live = vim.treesitter.highlighter.active[buf] ~= nil
+    out[#out+1] = vim.bo.filetype .. ":" .. (live and "ts" or "NONE")
+  end
+  print("TSATTACH=" .. table.concat(out, ","))
+' -c 'qa' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'TSATTACH=[a-z:,]*' | head -1)"
+rm -f /tmp/pwnts.s /tmp/pwnts.asm
+if [[ "$tsattach" == "TSATTACH=asm:ts,nasm:ts" ]]; then
+  say "treesitter attaches to asm + nasm buffers" "PASS"
+else
+  say "treesitter attaches to asm + nasm buffers" "FAIL (${tsattach:-no answer})"; fail=1
+fi
+
+# 6c. asm-lsp's own settings file. If the toml is missing or malformed the
+#     server exits at startup, which surfaces above as an LSP FAIL -- but check
+#     it directly so the cause is obvious rather than inferred.
+if [[ -f "$HOME/.config/asm-lsp/.asm-lsp.toml" ]]; then
+  say "asm-lsp global config present" "PASS"
+else
+  say "asm-lsp global config present" "FAIL: ~/.config/asm-lsp/.asm-lsp.toml missing"; fail=1
+fi
+
 man 2 read >/dev/null 2>&1 && say "man 2 (syscall lookup)" "PASS" || say "man 2 (syscall lookup)" "FAIL"
 
 # 7. pwntools snippets actually register (LuaSnip's fmta is strict: one unused
