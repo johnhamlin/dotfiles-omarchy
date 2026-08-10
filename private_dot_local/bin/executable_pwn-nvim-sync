@@ -283,28 +283,13 @@ chmod +x ~/.local/bin/lua-language-server'
   # is NATIVE readline (vi mode + prefix history search + menu completion in
   # ~/.inputrc) plus fzf/zoxide/starship. ble.sh was removed 2026-08-08 -- see
   # the header of overrides/bashrc and dead end #8 in the README.
+  #
+  # DELEGATED to pwn-bash-sync, which owns the shell-env file list. Keeping the
+  # list in one place is the point: `pwn-bash-sync` alone is the fast path for
+  # "I tweaked an alias", and it cannot drift from what the full sync ships.
+  # --no-check because this script runs its own, much broader, sweep below.
   ssh "$HOST" 'rm -rf ~/.local/share/blesh'   # remove a previously-synced ble.sh
-  ssh "$HOST" 'mkdir -p ~/.config'
-  # bash-completion: pure shell (no ELF), so it transplants offline. The dojo
-  # ships none, which is why bare bash there only completes filenames.
-  if [[ -r /usr/share/bash-completion/bash_completion ]]; then
-    "${RS[@]}" --delete /usr/share/bash-completion/ \
-      "$HOST:.local/share/bash-completion/"
-  else
-    echo "   warn: /usr/share/bash-completion not found locally, skipping" >&2
-  fi
-  "${RS[@]}" "$OVERRIDES/bashrc"       "$HOST:.bashrc"
-  "${RS[@]}" "$OVERRIDES/inputrc"      "$HOST:.inputrc"
-  # A login shell (what `ssh pwn` starts) reads .bash_profile, NOT .bashrc.
-  "${RS[@]}" "$OVERRIDES/bash_profile" "$HOST:.bash_profile"
-  # starship prompt: default config path is ~/.config/starship.toml (no env var
-  # needed). Leads with the hostname = the loaded challenge.
-  "${RS[@]}" "$OVERRIDES/starship.toml" "$HOST:.config/starship.toml"
-  # pwntools: gdb.attach() opens pwndbg in a tmux split (dojo ships neither file).
-  "${RS[@]}" "$OVERRIDES/pwn.conf"      "$HOST:.pwn.conf"
-  # gdb: persistent history + intel syntax. pwndbg is a separate binary and is
-  # NOT wired through ~/.gdbinit, so this cannot break it (verified).
-  "${RS[@]}" "$OVERRIDES/gdbinit"       "$HOST:.gdbinit"
+  pwn-bash-sync --host "$HOST" --with-completion --no-check "${DRY[@]}"
 
   if [[ ${#DRY[@]} -gt 0 ]]; then
     echo "==> dry run complete; skipping verification"

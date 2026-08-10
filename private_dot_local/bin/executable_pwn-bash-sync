@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# pwn-bash-sync -- push ONLY the shell environment to the pwn.college dojo.
+#
+# pwn-nvim-sync ships ~330 MB across six payloads and runs a 31-check sweep.
+# That is the wrong tool for "I tweaked an alias". This pushes just the shell
+# dotfiles, in a SINGLE ssh connection, in about a second.
+#
+# Source of truth is the same override directory, and pwn-nvim-sync delegates
+# its bash-env step to this script, so the two can never disagree about what
+# the dojo's shell env is:
+#
+#   ~/notes/pwn-college-nvim/overrides/
+#     bashrc        -> ~/.bashrc
+#     inputrc       -> ~/.inputrc          (readline: vi mode, I/N indicator)
+#     bash_profile  -> ~/.bash_profile     (login shells read THIS, not .bashrc)
+#     starship.toml -> ~/.config/starship.toml
+#     pwn.conf      -> ~/.pwn.conf         (pwntools gdb.attach -> tmux split)
+#     gdbinit       -> ~/.gdbinit          (persistent history + intel syntax)
+#
+# NEVER edit these files on the dojo box -- the next sync overwrites them.
+#
+# Usage:
+#   pwn-bash-sync [--dry-run] [--host NAME] [--with-completion] [--no-check]
+#
+#   --with-completion  also push the ~7.6 MB bash-completion tree (rarely
+#                      changes, so it is off by default; pwn-nvim-sync passes it)
+#   --no-check         skip the post-push sanity check
+set -euo pipefail
+
+HOST=pwn
+DRY=()
+WITH_COMPLETION=0
+CHECK=1
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY=(--dry-run); shift ;;
+    --host) HOST="$2"; shift 2 ;;
+    --with-completion) WITH_COMPLETION=1; shift ;;
+    --no-check) CHECK=0; shift ;;
+    -h|--help) grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+OVERRIDES="$HOME/notes/pwn-college-nvim/overrides"
+STAGE="$(mktemp -d)"
+trap 'rm -rf "$STAGE"' EXIT
+
+for f in bashrc inputrc bash_profile starship.toml pwn.conf gdbinit; do
+  [[ -f "$OVERRIDES/$f" ]] || { echo "missing override source: $OVERRIDES/$f" >&2; exit 1; }
+done
+
+# Syntax-gate the two files that bash actually SOURCES. Shipping a broken rc
+# means every new login on the dojo spews errors, and you get to debug it with
+# a half-configured shell. Cheap insurance; refuse to push instead.
+for f in bashrc bash_profile; do
+  if ! err="$(bash -n "$OVERRIDES/$f" 2>&1)"; then
+    echo "REFUSING TO PUSH -- $f has a syntax error:" >&2
+    echo "$err" | sed 's/^/    /' >&2
+    exit 1
+  fi
+done
+
+# Stage with the exact remote layout so the whole set goes in ONE rsync (one ssh
+# connection) instead of six.
+mkdir -p "$STAGE/.config"
+cp "$OVERRIDES/bashrc"        "$STAGE/.bashrc"
+cp "$OVERRIDES/inputrc"       "$STAGE/.inputrc"
+cp "$OVERRIDES/bash_profile"  "$STAGE/.bash_profile"
+cp "$OVERRIDES/pwn.conf"      "$STAGE/.pwn.conf"
+cp "$OVERRIDES/gdbinit"       "$STAGE/.gdbinit"
+cp "$OVERRIDES/starship.toml" "$STAGE/.config/starship.toml"
+
+echo "==> pushing shell env -> $HOST"
+# No --delete: this writes only the staged files and must not touch anything
+# else in $HOME on the dojo.
+rsync -a --info=stats1 "${DRY[@]}" "$STAGE/" "$HOST:"
+
+if [[ "$WITH_COMPLETION" -eq 1 ]]; then
+  if [[ -r /usr/share/bash-completion/bash_completion ]]; then
+    echo "==> pushing bash-completion (~7.6M, pure shell)"
+    rsync -a --delete --info=stats1 "${DRY[@]}" \
+      /usr/share/bash-completion/ "$HOST:.local/share/bash-completion/"
+  else
+    echo "   warn: /usr/share/bash-completion not found locally, skipping" >&2
+  fi
+fi
+
+if [[ ${#DRY[@]} -gt 0 ]]; then
+  echo "(dry run -- nothing written)"
+  exit 0
+fi
+
+[[ "$CHECK" -eq 1 ]] || exit 0
+
+# One ssh for the whole check. A login shell must be SILENT: anything printed
+# here is what you would see on every `ssh pwn`.
+#
+# -tt is load-bearing: without a controlling terminal, `bash -lic` emits
+# "cannot set terminal process group" + "no job control in this shell", which
+# have nothing to do with the rc and would be a permanent false positive on the
+# silence check. A real `ssh pwn` has a TTY, so test with one.
+echo "==> checking"
+out="$(ssh -tt "$HOST" 'bash -lic "
+  printf \"VI=%s\n\" \"\$(shopt -po vi 2>/dev/null)\"
+  printf \"HEAL=%s\n\" \"\$(type -t __heal_kbd_protocol 2>/dev/null)\"
+  printf \"MODE=%s\n\" \"\$(bind -v 2>/dev/null | grep -c \"show-mode-in-prompt on\")\"
+  printf \"COMP=%s\n\" \"\$(type -t _comp_load 2>/dev/null || type -t _completion_loader 2>/dev/null)\"
+"' 2>&1 </dev/null | tr -d '\r')"
+
+# Drop our own result lines and ssh's own closing notice; whatever is left is
+# genuine login noise.
+noise="$(grep -avE '^(VI|HEAL|MODE|COMP)=' <<<"$out" \
+         | grep -avE '^Connection to .* closed\.$' \
+         | grep -av '^$' || true)"
+
+status=0
+grep -q 'VI=set -o vi'   <<<"$out" || { echo "  FAIL: vi mode not set";              status=1; }
+grep -q 'HEAL=function'  <<<"$out" || { echo "  FAIL: __heal_kbd_protocol missing";  status=1; }
+grep -q 'MODE=1'         <<<"$out" || { echo "  FAIL: vi mode indicator off";        status=1; }
+grep -q 'COMP=function'  <<<"$out" || { echo "  warn: bash-completion not loaded (try --with-completion)"; }
+
+if [[ -n "$noise" ]]; then
+  echo "  FAIL: login shell is NOT silent -- you would see this on every ssh:"
+  echo "$noise" | sed 's/^/      /'
+  status=1
+fi
+
+if [[ "$status" -eq 0 ]]; then
+  echo "  OK -- vi mode, mode indicator, kbd heal, silent login"
+  echo "  (reconnect: readline only re-reads ~/.inputrc on a fresh login)"
+fi
+exit "$status"
