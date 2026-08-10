@@ -96,6 +96,68 @@ stage_asm_lsp() {
   return 0
 }
 
+# tree-sitter-asm, PATCHED for GAS. Two upstream bugs, both of which break the
+# .s files pwn.college has you write. Neither is fixed upstream (main == the
+# revision nvim-treesitter pins), and neither is fixable with a query -- the
+# parse TREE is wrong.
+#
+# 1. `#` is GAS's line comment character, but the grammar also accepts it as the
+#    prefix of an ARM-style immediate (`mov r0, #42`). In any state where
+#    another operand could still follow -- i.e. after a 0- or 1-operand
+#    instruction -- the lexer takes the immediate branch and derails:
+#
+#      push rax    # note  ->  (instruction (ident) (int (MISSING "int_token1")) ...)
+#      syscall     # note  ->  (instruction (ERROR) ...)
+#      mov rax, 60 # note  ->  fine (a second int operand cannot follow without
+#                              a comma, so only line_comment is valid there)
+#
+#    The damage is not local: the derailed instruction swallows the lines after
+#    it, so one inline comment can grey out half a file. The patch drops the
+#    `#`-immediate alternative -- it costs ARM immediates and nothing else here.
+#
+# 2. Intel-syntax size specifiers were lower-case-only, so `cmp BYTE PTR [r8],
+#    0x0` -- the spelling objdump emits and the one John writes -- was an ERROR
+#    node. The patch matches either case and aliases back to the lower-case
+#    literal, so queries/asm/highlights.scm still paints them as @keyword.
+#
+# Built rather than vendored: network + node are needed exactly once, and the
+# .so is then cached in the git-ignored payload/ like asm-lsp. tree-sitter-cli
+# is pinned to what upstream generates with, so the output stays at parser ABI
+# 14 -- the same ABI as the parser it replaces.
+TS_ASM_REV=839741fef4dab5128952334624905c82b40c7133
+TS_ASM_URL="https://github.com/RubixDev/tree-sitter-asm"
+TS_ASM_CLI=0.22.6
+TS_ASM_SO="$PROJECT/payload/tree-sitter-asm/asm.so"
+TS_ASM_PATCH="$PROJECT/patches/tree-sitter-asm-gas.patch"
+
+# Build the patched parser into payload/, unless it is already there. Same
+# contract as stage_asm_lsp: returns non-zero without killing the run, in which
+# case the dojo keeps whatever site/parser/asm.so the plain push put there.
+stage_asm_parser() {
+  [[ -f "$TS_ASM_SO" ]] && return 0
+  [[ ${#DRY[@]} -gt 0 ]] && { echo "   (dry run) would build patched tree-sitter-asm"; return 1; }
+  [[ -f "$TS_ASM_PATCH" ]] || { echo "   warn: $TS_ASM_PATCH missing, shipping upstream asm parser" >&2; return 1; }
+  for t in git npx cc; do
+    command -v "$t" >/dev/null || { echo "   warn: need $t to build the patched asm parser, skipping" >&2; return 1; }
+  done
+
+  local tmp
+  tmp="$(mktemp -d)"
+  echo "   building patched tree-sitter-asm (one time, then cached in payload/)"
+  if ! git clone -q "$TS_ASM_URL" "$tmp/src" \
+    || ! git -C "$tmp/src" checkout -q "$TS_ASM_REV" \
+    || ! git -C "$tmp/src" apply "$TS_ASM_PATCH" \
+    || ! (cd "$tmp/src" && npx --yes tree-sitter-cli@"$TS_ASM_CLI" generate) >/dev/null 2>&1 \
+    || ! cc -O2 -fPIC -shared -I"$tmp/src/src" "$tmp/src/src/parser.c" -o "$tmp/asm.so"; then
+    echo "   warn: could not build the patched asm parser, shipping upstream's" >&2
+    rm -rf "$tmp"; return 1
+  fi
+  mkdir -p "$(dirname "$TS_ASM_SO")"
+  install -m 644 "$tmp/asm.so" "$TS_ASM_SO"
+  rm -rf "$tmp"
+  return 0
+}
+
 # rsync flags. -a preserves symlinks as-is. That is WRONG for site/queries/*:
 # nvim-treesitter (main branch) installs each language's queries as a symlink
 # site/queries/<lang> -> $HOME/.local/share/nvim/lazy/nvim-treesitter/runtime/
@@ -231,6 +293,11 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
   # they don't dangle under the dojo's /home/hacker (see RS comment above).
   # --delete so a stale dangling symlink from an earlier sync is replaced.
   "${RS[@]}" --copy-links --delete "$DATA/site/queries" "$HOST:.local/share/nvim/site/"
+  # Overlay the patched asm parser AFTER the bulk push, so the dojo is correct
+  # even when this desktop's own copy has been reverted by a `:TSUpdate asm`.
+  if stage_asm_parser; then
+    "${RS[@]}" "$TS_ASM_SO" "$HOST:.local/share/nvim/site/parser/asm.so"
+  fi
 
   echo "==> [5/7] pushing LSP servers / formatters -> $HOST:~/.local/bin"
   # Direct single-file ELF binaries: ship the resolved real file.
@@ -452,6 +519,30 @@ if [[ "$tsattach" == "TSATTACH=asm:ts,nasm:ts" ]]; then
   say "treesitter attaches to asm + nasm buffers" "PASS"
 else
   say "treesitter attaches to asm + nasm buffers" "FAIL (${tsattach:-no answer})"; fail=1
+fi
+
+# 6bb. GAS `#` comments -- the two things that were broken for .s files.
+#      (a) the patched parser must produce an error-free tree for an inline `#`
+#          comment after a 0- and a 1-operand instruction (upstream reads `#`
+#          as the start of an ARM immediate there and derails) and for an
+#          upper-case `BYTE PTR` (upstream accepts lower case only);
+#      (b) `gc` must insert `#`, not the `;` that runtime/ftplugin/asm.vim sets.
+#      Check the string `gc` ACTUALLY uses, i.e. run it -- vim._comment ignores
+#      the buffer-local option whenever a treesitter parser is attached.
+printf '.intel_syntax noprefix\npush rax   # one operand\nsyscall    # none\ncmp BYTE PTR [r8], 0x0  # upper-case size specifier\nmov rax, 60\n' > /tmp/pwngas.s
+gas="$(nvim --headless /tmp/pwngas.s -c 'lua
+  local p = vim.treesitter.get_parser(0, "asm"); p:parse()
+  local clean = not p:trees()[1]:root():has_error()
+  vim.api.nvim_win_set_cursor(0, { 5, 0 })
+  vim.cmd("normal gcc")
+  local cs = (vim.api.nvim_buf_get_lines(0, 4, 5, false)[1] or ""):match("^%s*(%S+)") or "?"
+  print(("GAS=%s,%s"):format(clean and "clean" or "ERROR", cs))
+' -c 'qa!' </dev/null 2>&1 | tr -d '\033' | grep -aoE 'GAS=[a-zA-Z]+,[^ ]+' | head -1)"
+rm -f /tmp/pwngas.s
+if [[ "$gas" == "GAS=clean,#" ]]; then
+  say "GAS: # comments parse + gc comments with #" "PASS"
+else
+  say "GAS: # comments parse + gc comments with #" "FAIL (${gas:-no answer})"; fail=1
 fi
 
 # 6c. asm-lsp's own settings file. If the toml is missing or malformed the
