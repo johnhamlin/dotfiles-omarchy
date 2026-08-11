@@ -96,6 +96,87 @@ stage_asm_lsp() {
   return 0
 }
 
+# asm-lsp, PATCHED. Upstream applies the didChange to its copy of the document
+# text BEFORE it converts that same change into a tree_sitter::InputEdit, and
+# the conversion resolves `old_end_byte` with `doc.offset_at()` -- against the
+# already-updated text. On a DELETION that clamps, understating how much was
+# removed, so tree-sitter reuses subtrees it should have invalidated and every
+# node after the edit keeps a byte range that is too large. The next
+# `Node::utf8_text()` slices past the end of the shorter text and the server
+# dies with a Rust panic (exit 101):
+#
+#   thread 'main' panicked at tree-sitter-0.22.6/binding_rust/lib.rs:1433:31:
+#   range end index 186 out of range for slice of length 181
+#
+# Reproduced deterministically: a multi-byte delete ABOVE a label kills it,
+# single-char backspaces and inserts do not (explore_node only reads text for
+# `ident` children of `label` nodes, so a corrupt trailing node has to be a
+# label to get touched). That is why it looks intermittent -- `dd`/`daw` above a
+# label crashes it, ordinary typing never does.
+#
+# Not fixed upstream: v0.10.1 is the newest release and master has the identical
+# ordering. Forcing full-document sync is WORSE -- a rangeless change makes
+# text_doc_change_to_ts_edit return Err, and main.rs propagates notification
+# errors with `?` straight out of the main loop, killing the server on the very
+# first keystroke.
+#
+# Built in a container, not on this host: the dojo is glibc 2.39 and this
+# desktop is 2.44, so a native build would not start there. bookworm is 2.36 --
+# margin, not a floor. Verified: 143/143 upstream tests pass with the patch.
+ASM_LSP_PATCH="$PROJECT/patches/asm-lsp-didchange-order.patch"
+ASM_LSP_SRC_URL="https://github.com/bergercookie/asm-lsp"
+ASM_LSP_IMAGE="rust:bookworm"
+ASM_LSP_GLIBC_MAX=2.39 # the dojo's; the build must not need anything newer
+ASM_LSP_PATCHED="$PROJECT/payload/asm-lsp/asm-lsp-$ASM_LSP_VERSION-patched"
+
+# Build the patched server into payload/, unless it is already there. Same
+# contract as stage_asm_parser: returns non-zero WITHOUT killing the run, in
+# which case the caller ships the stock binary -- an occasionally-crashing
+# assembly LSP still beats none.
+stage_asm_lsp_patched() {
+  [[ -x "$ASM_LSP_PATCHED" ]] && return 0
+  [[ ${#DRY[@]} -gt 0 ]] && { echo "   (dry run) would build patched asm-lsp $ASM_LSP_VERSION"; return 1; }
+  [[ -f "$ASM_LSP_PATCH" ]] || { echo "   warn: $ASM_LSP_PATCH missing, shipping stock asm-lsp" >&2; return 1; }
+  for t in git docker objdump; do
+    command -v "$t" >/dev/null || { echo "   warn: need $t to build patched asm-lsp, shipping stock" >&2; return 1; }
+  done
+  docker info >/dev/null 2>&1 || { echo "   warn: docker daemon unreachable, shipping stock asm-lsp" >&2; return 1; }
+
+  local tmp built need
+  tmp="$(mktemp -d)"
+  echo "   building patched asm-lsp $ASM_LSP_VERSION in $ASM_LSP_IMAGE (one time, then cached in payload/)"
+  # --user keeps target/ owned by us so the cleanup below can remove it;
+  # CARGO_HOME must then point somewhere that user can actually write.
+  if ! git clone -q --depth 1 --branch "v$ASM_LSP_VERSION" "$ASM_LSP_SRC_URL" "$tmp/src" \
+    || ! git -C "$tmp/src" apply "$ASM_LSP_PATCH" \
+    || ! docker run --rm -v "$tmp/src:/src" -w /src \
+      --user "$(id -u):$(id -g)" -e CARGO_HOME=/src/.cargo-home \
+      "$ASM_LSP_IMAGE" cargo build --release -p asm-lsp --bin asm-lsp >/dev/null 2>&1; then
+    echo "   warn: could not build patched asm-lsp, shipping stock (it panics on multi-byte deletes)" >&2
+    rm -rf "$tmp"; return 1
+  fi
+
+  built="$tmp/src/target/release/asm-lsp"
+  [[ -x "$built" ]] || {
+    echo "   warn: patched asm-lsp build produced no binary, shipping stock" >&2
+    rm -rf "$tmp"; return 1
+  }
+
+  # Refuse to ship something the dojo's glibc cannot load. That failure mode
+  # presents as "the server just never starts", which is the hardest symptom to
+  # trace back to this function.
+  need="$(objdump -T "$built" | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -1)"
+  if [[ "$(printf '%s\n%s\n' "$need" "$ASM_LSP_GLIBC_MAX" | sort -V | tail -1)" != "$ASM_LSP_GLIBC_MAX" ]]; then
+    echo "   warn: patched asm-lsp needs glibc $need > dojo's $ASM_LSP_GLIBC_MAX, shipping stock" >&2
+    rm -rf "$tmp"; return 1
+  fi
+
+  mkdir -p "$(dirname "$ASM_LSP_PATCHED")"
+  install -m 755 "$built" "$ASM_LSP_PATCHED"
+  rm -rf "$tmp"
+  return 0
+}
+
 # tree-sitter-asm, PATCHED for GAS. Two upstream bugs, both of which break the
 # .s files pwn.college has you write. Neither is fixed upstream (main == the
 # revision nvim-treesitter pins), and neither is fixable with a query -- the
@@ -314,7 +395,19 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
   # are not git repos and do not persist, so there is nowhere to keep a
   # project-local .asm-lsp.toml.
   if stage_asm_lsp; then
-    "${RS[@]}" "$ASM_LSP_BIN" "$HOST:.local/bin/asm-lsp"
+    # Prefer the locally-built patched server; fall back to the stock release if
+    # the build could not run (no docker, no network). See stage_asm_lsp_patched
+    # for what the patch fixes and why upstream cannot supply it.
+    # Record which one actually went out. Without this a fallback to the stock
+    # release is invisible -- everything still works until the day you delete a
+    # line above a label and the server dies. §6d below reads this back.
+    if stage_asm_lsp_patched; then
+      "${RS[@]}" "$ASM_LSP_PATCHED" "$HOST:.local/bin/asm-lsp"
+      ssh "$HOST" 'mkdir -p ~/.local/share/pwn-nvim && echo patched > ~/.local/share/pwn-nvim/asm-lsp.variant'
+    else
+      "${RS[@]}" "$ASM_LSP_BIN" "$HOST:.local/bin/asm-lsp"
+      ssh "$HOST" 'mkdir -p ~/.local/share/pwn-nvim && echo stock > ~/.local/share/pwn-nvim/asm-lsp.variant'
+    fi
     require_override "$OVERRIDES/asm-lsp.toml"
     ssh "$HOST" 'mkdir -p ~/.config/asm-lsp'
     "${RS[@]}" "$OVERRIDES/asm-lsp.toml" "$HOST:.config/asm-lsp/.asm-lsp.toml"
@@ -553,6 +646,20 @@ if [[ -f "$HOME/.config/asm-lsp/.asm-lsp.toml" ]]; then
 else
   say "asm-lsp global config present" "FAIL: ~/.config/asm-lsp/.asm-lsp.toml missing"; fail=1
 fi
+
+# 6d. WHICH asm-lsp is deployed. The stock v0.10.1 release panics (exit 101) on
+#     any multi-byte deletion above a label -- `dd`, `daw`, a visual delete --
+#     because it converts the didChange to a tree-sitter InputEdit AFTER already
+#     applying it to its copy of the text. The push ships a patched build; this
+#     reads back which one actually landed, because a silent fallback to stock
+#     looks completely healthy right up until the server dies mid-edit.
+#     Not fatal: stock is degraded, not broken, and nvim restarts it (on_exit in
+#     zz-pwn.lua). Loud, though -- it means the build did not run.
+case "$(cat "$HOME/.local/share/pwn-nvim/asm-lsp.variant" 2>/dev/null)" in
+  patched) say "asm-lsp is the patched build (no didChange panic)" "PASS" ;;
+  stock)   say "asm-lsp is the patched build (no didChange panic)" "WARN: STOCK shipped -- panics on multi-byte deletes; check docker on the desktop" ;;
+  *)       say "asm-lsp is the patched build (no didChange panic)" "WARN: unknown -- re-run pwn-nvim-sync" ;;
+esac
 
 man 2 read >/dev/null 2>&1 && say "man 2 (syscall lookup)" "PASS" || say "man 2 (syscall lookup)" "FAIL"
 
