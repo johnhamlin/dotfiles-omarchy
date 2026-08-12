@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Pull John's pwn.college coursework down from the dojo into a local git repo.
+#
+#   dojo:~/code  --rsync-->  ~/code/pwn-college  --git commit-->  history
+#
+# WHY GIT AND NOT A PLAIN MIRROR: the dojo home lives in a container. If it is
+# ever reset, ~/code there goes empty -- and a --delete mirror would faithfully
+# reproduce that emptiness locally, destroying the only copy. With git, the
+# working tree still tracks the dojo exactly (so renames and deletions show up
+# properly, which an additive-only rsync could never do) while every previous
+# state stays recoverable with `git log`. The repo has NO remote and is never
+# pushed; it is a local safety net, not a publishing step.
+#
+# Run by hand any time, or daily via pwn-code-sync.timer.
+#   pwn-code-sync            sync + commit
+#   pwn-code-sync -n         dry run: show what rsync would do, touch nothing
+#   pwn-code-sync -v         show the rsync file list
+set -uo pipefail
+
+HOST=pwn
+REMOTE_DIR=code
+DEST="$HOME/code/pwn-college"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/pwn-code-sync.lock"
+
+DRY=0
+VERBOSE=0
+for a in "$@"; do
+  case "$a" in
+  -n | --dry-run) DRY=1 ;;
+  -v | --verbose) VERBOSE=1 ;;
+  -h | --help)
+    sed -n '2,20p' "$0" | sed 's/^# \?//'
+    exit 0
+    ;;
+  *)
+    echo "unknown option: $a" >&2
+    exit 2
+    ;;
+  esac
+done
+
+say() { printf '%s\n' "$*"; }
+die() {
+  printf 'pwn-code-sync: %s\n' "$*" >&2
+  exit 1
+}
+
+# Only one at a time -- the timer and a manual run must not race on the index.
+exec 9>"$LOCK"
+flock -n 9 || {
+  say "another pwn-code-sync is running, skipping"
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
+# 1. Is the dojo up?
+#
+# The container is only running while John has a challenge open, so "not
+# reachable" is the NORMAL state most of the day. Exit 0, not 1: a timer unit
+# that fails every night trains you to ignore it, and then you miss the failure
+# that matters. BatchMode stops ssh from blocking on a passphrase prompt under
+# systemd, where there is no tty to answer it.
+# ---------------------------------------------------------------------------
+if ! ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST" true 2>/dev/null; then
+  say "dojo not reachable -- nothing to do (this is normal when no challenge is running)"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Refuse to mirror an empty or missing source.
+#
+# THE failure this whole script has to survive: a fresh container has no ~/code
+# yet. Mirroring that would stage the deletion of everything. Git would still
+# hold the history, but the working tree would empty out for no reason and the
+# commit log would fill with noise. Bail instead -- a missing source is never a
+# legitimate instruction to delete work.
+# ---------------------------------------------------------------------------
+n_remote=$(ssh -o BatchMode=yes "$HOST" "find ~/$REMOTE_DIR -type f 2>/dev/null | wc -l" 2>/dev/null || echo 0)
+if [[ "$n_remote" -eq 0 ]]; then
+  die "dojo ~/$REMOTE_DIR is missing or empty ($n_remote files) -- refusing to mirror that over $DEST"
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Make sure the destination is a git repo, and that whatever is already
+#    sitting there is committed BEFORE the first mirror runs.
+#
+# ~/code/pwn-college pre-dates this script and held an ad-hoc copy of some
+# files. They are not on the dojo under those names, so step 4 would delete
+# them. Committing first means they are in history rather than gone.
+# ---------------------------------------------------------------------------
+mkdir -p "$DEST"
+if [[ ! -d "$DEST/.git" ]]; then
+  if [[ $DRY -eq 1 ]]; then
+    say "(dry run) would git init $DEST"
+  else
+    git -C "$DEST" init -q
+    git -C "$DEST" symbolic-ref HEAD refs/heads/main
+    if [[ -n "$(ls -A "$DEST" | grep -v '^\.git$' || true)" ]]; then
+      git -C "$DEST" add -A
+      git -C "$DEST" -c user.name="pwn-code-sync" \
+        -c user.email="pwn-code-sync@localhost" \
+        commit -q -m "pre-sync: local state before pwn-code-sync took over
+
+Whatever was in ~/code/pwn-college before this script existed, captured so
+the first mirror cannot silently drop it." || true
+      say "captured pre-existing local files in an initial commit"
+    fi
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 4. Mirror.
+#
+# --delete so renames and removals on the dojo are reflected rather than
+# accumulating forever; safe here only because step 3 guarantees a git history
+# behind it and step 2 guarantees the source is real.
+#
+# /.git/ and /.gitignore are ours, not the dojo's -- excluded so --delete does
+# not remove them (rsync does not delete excluded files unless you also pass
+# --delete-excluded, which we deliberately do not).
+# ---------------------------------------------------------------------------
+RS=(rsync -a --delete --exclude=/.git/ --exclude=/.gitignore --info=stats1)
+[[ $VERBOSE -eq 1 ]] && RS+=(-v)
+[[ $DRY -eq 1 ]] && RS+=(--dry-run)
+
+say "syncing $HOST:~/$REMOTE_DIR/ -> $DEST/  ($n_remote files on the dojo)"
+"${RS[@]}" "$HOST:$REMOTE_DIR/" "$DEST/" || die "rsync failed"
+
+[[ $DRY -eq 1 ]] && {
+  say "(dry run) stopping before commit"
+  exit 0
+}
+
+# ---------------------------------------------------------------------------
+# 5. Keep build artifacts out of the HISTORY (but on disk).
+#
+# They are mirrored to disk -- they cost 168K and are occasionally handy to
+# have next to the source -- but committing them would bury 35 hand-written .s
+# files under churning .o/.so/ELF blobs that change on every rebuild.
+#
+# Extensions are not enough: the dojo's compiled outputs are mostly EXTENSIONLESS
+# (`program`, `out`), while some extensionless files are real text (`hex2ascii`).
+# So the ELF list is regenerated from actual file contents each run, and written
+# into .git/info/exclude rather than .gitignore -- .gitignore would be a tracked
+# file that rsync has to be told to protect, and it is not the dojo's business.
+# ---------------------------------------------------------------------------
+excl="$DEST/.git/info/exclude"
+mkdir -p "$(dirname "$excl")"
+{
+  echo "# Generated by pwn-code-sync -- do not edit, rewritten every run."
+  echo "# Build artifacts: mirrored to disk, kept out of git history."
+  echo "*.o"
+  echo "*.so"
+  # Extensionless ELF binaries, identified by content.
+  while IFS= read -r -d '' f; do
+    case "$f" in *.s | *.o | *.so | *.txt | *.md) continue ;; esac
+    if [[ "$(file -b --mime-type "$f" 2>/dev/null)" == application/x-* ]] &&
+      file -b "$f" 2>/dev/null | grep -q '^ELF '; then
+      printf '/%s\n' "${f#"$DEST"/}"
+    fi
+  done < <(find "$DEST" -type f -not -path "$DEST/.git/*" -print0)
+} >"$excl"
+
+# ---------------------------------------------------------------------------
+# 6. Commit whatever moved.
+#
+# Identity is set per-invocation rather than relying on John's global git
+# config, so the log makes clear these commits are machine-made.
+# ---------------------------------------------------------------------------
+cd "$DEST" || die "cannot cd $DEST"
+git add -A
+if git diff --cached --quiet; then
+  say "no changes since last sync"
+  exit 0
+fi
+
+added=$(git diff --cached --numstat | wc -l)
+summary=$(git diff --cached --name-status | awk '{print $1}' | sort | uniq -c |
+  awk '{printf "%s%s ", $1, substr($2,1,1)}')
+
+git -c user.name="pwn-code-sync" -c user.email="pwn-code-sync@localhost" \
+  commit -q -m "sync from dojo: $added file(s) changed [$summary]" \
+  -m "Mirrored from $HOST:~/$REMOTE_DIR by pwn-code-sync."
+
+say "committed: $(git log --oneline -1)"

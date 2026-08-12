@@ -1,0 +1,14 @@
+[Unit]
+Description=Daily pull of pwn.college coursework from the dojo
+
+[Timer]
+OnCalendar=daily
+# Catch up after the machine has been off -- without this a desktop that is
+# suspended at 00:00 simply skips that day's sync entirely.
+Persistent=true
+# Nothing else is competing for this slot; the jitter just avoids firing at the
+# exact instant every other daily unit does.
+RandomizedDelaySec=30m
+
+[Install]
+WantedBy=timers.target

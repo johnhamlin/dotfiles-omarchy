@@ -1,0 +1,15 @@
+[Unit]
+Description=Pull pwn.college coursework down from the dojo into ~/code/pwn-college
+Documentation=file:///home/john/notes/pwn-code-sync.md
+# Pointless without a route to dojo.pwn.college; the script also exits 0 on its
+# own when the container is not up, so a missed window is never an error.
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/pwn-code-sync
+# The dojo container is up only while a challenge is running. Do NOT add
+# Restart= here: retrying against a box that is simply switched off achieves
+# nothing, and hammering an ssh chain on a timer is exactly what jammed the
+# work-laptop sshd (see notes/CLAUDE.md). The next daily run is soon enough.
+TimeoutStartSec=10min
