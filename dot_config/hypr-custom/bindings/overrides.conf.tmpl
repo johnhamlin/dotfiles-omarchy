@@ -78,14 +78,16 @@ bindd = SUPER, PERIOD, Next workspace on monitor, workspace, m+1
 bindd = SUPER SHIFT, COMMA, Previous window in group, changegroupactive, b
 bindd = SUPER SHIFT, PERIOD, Next window in group, changegroupactive, f
 
-# Send the window to the adjacent workspace on this monitor, following it.
-# `movetoworkspace` takes the same relative selectors as `workspace`, so no
-# special dispatcher is needed. Note m±1 WRAPS (ws 10 -> ws 1) and Hyprland
-# 0.56.1 has no no-wrap variant — m~+1 / r~+1 / e~+1 are all rejected.
-# Swap to movetoworkspacesilent to stay put instead of following.
+# Send the window to the monitor on the left/right, following it. The
+# dispatcher is `movewindow` with a `mon:` arg — there is no
+# `movewindowtomonitor` (verified: "Invalid dispatcher"). Unlike workspace
+# m±1 this does NOT wrap: at the end monitor the window stays put.
+# Layout here is DP-3 (x=0) | DP-1 (x=1440) | DP-2 (x=4000).
+# Distinct from SUPER+SHIFT+ALT+arrows, which move the whole WORKSPACE
+# between monitors rather than a single window.
 # Nothing in the default chain binds SUPER+CTRL+SHIFT+H/L, so no unbind.
-bindd = SUPER CTRL SHIFT, H, Move window to previous workspace, movetoworkspace, m-1
-bindd = SUPER CTRL SHIFT, L, Move window to next workspace, movetoworkspace, m+1
+bindd = SUPER CTRL SHIFT, H, Move window to left monitor, movewindow, mon:l
+bindd = SUPER CTRL SHIFT, L, Move window to right monitor, movewindow, mon:r
 
 # Notifications — mako. Same modifier layout as Omarchy's comma family.
 bindd = SUPER, SEMICOLON, Dismiss last notification, exec, makoctl dismiss
