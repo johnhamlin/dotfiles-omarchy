@@ -78,6 +78,15 @@ bindd = SUPER, PERIOD, Next workspace on monitor, workspace, m+1
 bindd = SUPER SHIFT, COMMA, Previous window in group, changegroupactive, b
 bindd = SUPER SHIFT, PERIOD, Next window in group, changegroupactive, f
 
+# Send the window to the adjacent workspace on this monitor, following it.
+# `movetoworkspace` takes the same relative selectors as `workspace`, so no
+# special dispatcher is needed. Note m±1 WRAPS (ws 10 -> ws 1) and Hyprland
+# 0.56.1 has no no-wrap variant — m~+1 / r~+1 / e~+1 are all rejected.
+# Swap to movetoworkspacesilent to stay put instead of following.
+# Nothing in the default chain binds SUPER+CTRL+SHIFT+H/L, so no unbind.
+bindd = SUPER CTRL SHIFT, H, Move window to previous workspace, movetoworkspace, m-1
+bindd = SUPER CTRL SHIFT, L, Move window to next workspace, movetoworkspace, m+1
+
 # Notifications — mako. Same modifier layout as Omarchy's comma family.
 bindd = SUPER, SEMICOLON, Dismiss last notification, exec, makoctl dismiss
 bindd = SUPER SHIFT, SEMICOLON, Dismiss all notifications, exec, makoctl dismiss --all
