@@ -74,26 +74,54 @@ git -C ~/.local/share/omarchy checkout <new-tag>
 Anything touching boot/pacman/NVIDIA/NetworkManager in a migration is skipped,
 always. `iommu=pt` must be on `/proc/cmdline` at every checkpoint.
 
-## Keybindings — this machine's architecture (differs from stock)
+## Keybindings — this machine's architecture (reworked 2026-08-12)
 
-**Omarchy's default binding files are deliberately NEVER sourced.** John's
-keymap is authoritative and lives in chezmoi at
-`dot_config/hypr-custom/bindings/{tiling.conf,apps.conf,media.conf.tmpl,utilities.conf.tmpl}`
-(deployed without `.tmpl`). Wanted Omarchy features are bound explicitly.
+**Omarchy's four default binding files ARE sourced** — `media.conf`,
+`clipboard.conf`, `tiling-v2.conf`, `utilities.conf` — exactly the set a stock
+install sources. This changed on 2026-08-12; the old design hand-copied all 160
+binds and 110 of them were byte-identical to upstream, so every Omarchy release
+left the machine behind. Full audit: `~/notes/keybindings-audit-2026-08-12.md`.
 
-- The stock skill's "add `unbind` before rebinding" advice does NOT apply —
-  Omarchy defaults aren't loaded, so there is nothing to unbind. Check
-  collisions with `hyprctl binds -j` instead (duplicate key+mod combos STACK
-  in Hyprland — both fire).
-- The SUPER+F12 passthrough submap at the end of `utilities.conf.tmpl` must
+John's delta lives in chezmoi at
+`dot_config/hypr-custom/bindings/{apps.conf,overrides.conf.tmpl}`
+(deployed without `.tmpl`).
+
+- **The stock skill's "add `unbind` before rebinding" advice DOES apply now.**
+  Duplicate key+mod combos STACK in Hyprland (both fire). Every override in
+  `overrides.conf` is paired with its `unbind` — if you add one, add the other.
+- **`apps.conf` needs no unbinds** and must stay that way: upstream ships app
+  launchers in the *user* file `~/.config/hypr/bindings.conf`, which is not in
+  the default source chain, so nothing collides. Anything that DOES collide
+  with a default belongs in `overrides.conf`.
+- **After moving the Omarchy pin, run `~/.local/bin/hypr-binds-check`** (must
+  exit 0). That is when upstream can silently stack a new bind onto an
+  override. It compares key names case-insensitively on purpose —
+  `SUPER, comma` and `SUPER, COMMA` are the same bind but look different in
+  `hyprctl binds -j`.
+- The SUPER+F12 passthrough submap at the end of `overrides.conf.tmpl` must
   remain the LAST bind-defining content in the whole source chain.
 - `bindd = MODS, KEY, Description, dispatcher, args` is the house format.
 - View current map: `omarchy menu keybindings --print` or SUPER+CTRL+K.
-- Notable non-stock choices: SUPER+SPACE walker, SUPER+SHIFT+SPACE and
-  SUPER+SHIFT+ESCAPE → omarchy-menu, SUPER+ESCAPE → system menu,
-  SUPER+CTRL+A/B/W/T → omarchy-launch-{audio,bluetooth,wifi,tui btop},
-  Compose = **Right Alt** (CapsLock is keyd-owned: ctrl/esc overload),
-  PRINT → hyprshot (deliberate; not the stock satty flow).
+  Correct count is **205**.
+- Notable non-stock choices: vim SUPER+H/J/K/L focus (so SUPER+CTRL+J is
+  togglesplit and SUPER+CTRL+K the keybindings menu), SUPER+Q close,
+  SUPER+F/SUPER+CTRL+F fullscreen semantics inverted for gamescope,
+  SUPER+SHIFT+SPACE and SUPER+SHIFT+ESCAPE → omarchy-menu with
+  SUPER+ALT+SPACE → waybar toggle (swapped vs stock), SUPER+comma/period →
+  workspace on monitor with SUPER+SHIFT+comma/period → group nav, mako family
+  on **semicolon** (the comma cluster is navigation here), SUPER+M/D →
+  per-workspace layout via `hypr-workspace-layout`, Compose = **Right Alt**
+  (CapsLock is keyd-owned: ctrl/esc overload), PRINT → hyprshot (deliberate;
+  not the stock satty flow), SUPER+BACKSPACE deliberately unbound (opacity
+  policy), SUPER+CTRL+W wifi via **absolute path** to the local shadow.
+- Helper scripts: call the **omarchy-\*** names (`omarchy-cmd-terminal-cwd`,
+  `omarchy-launch-browser`, `omarchy-launch-or-focus`, `omarchy-launch-editor`,
+  `omarchy-launch-tui`). The old un-prefixed forks in `~/.local/bin`
+  (`terminal-cwd`, `launch-browser`, `launch-or-focus`) were byte-identical and
+  were deleted 2026-08-12 — don't recreate them.
+- Omarchy's `omarchy-hyprland-workspace-layout-toggle` cycles **dwindle ↔
+  scrolling**, NOT master ↔ dwindle. It's unbound here for that reason;
+  `SUPER+ALT+L` is free if scrolling is ever wanted.
 
 ## Machine-specific policies (do not "fix" these toward stock)
 
