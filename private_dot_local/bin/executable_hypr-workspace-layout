@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Set the tiling layout for the ACTIVE workspace only, rather than globally.
+#
+# Bound to SUPER+M (master) and SUPER+D (dwindle). Omarchy ships
+# omarchy-hyprland-workspace-layout-toggle, but that only cycles
+# dwindle <-> scrolling and so cannot reach master at all.
+#
+# This writes a runtime `workspace` rule, so like Omarchy's toggle it does
+# NOT survive `hyprctl reload` — the workspace falls back to general:layout.
+
+layout="${1:?usage: hypr-workspace-layout <master|dwindle|scrolling>}"
+
+case "$layout" in
+master | dwindle | scrolling) ;;
+*)
+  echo "hypr-workspace-layout: unknown layout '$layout'" >&2
+  exit 1
+  ;;
+esac
+
+ws=$(hyprctl activeworkspace -j | jq -r '.id')
+hyprctl keyword workspace "$ws, layout:$layout" >/dev/null
+
+notify-send -u low "󱂬    Workspace $ws layout: $layout"

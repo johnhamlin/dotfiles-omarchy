@@ -1,0 +1,158 @@
+# ═══════════════════════════════════════════════════════════════════════
+# John's keymap layer — overrides on top of Omarchy's sourced defaults
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ARCHITECTURE (changed 2026-08-12; see ~/notes/keybindings-audit-2026-08-12.md)
+#
+# Omarchy's four default binding files ARE now sourced from ~/.config/hypr/
+# hyprland.conf:  media.conf, clipboard.conf, tiling-v2.conf, utilities.conf.
+# Before this, all ~160 binds were hand-copied here, of which 110 were
+# byte-identical to Omarchy's — so every Omarchy release silently left this
+# machine behind. This file is the delta instead.
+#
+# THE ONE RULE: duplicate binds STACK in Hyprland (both fire). So every combo
+# Omarchy binds that we want to mean something else must be `unbind`ed FIRST.
+# Every unbind below is paired with the reason. If you add an override, add
+# the unbind with it.
+#
+# AFTER MOVING THE OMARCHY PIN, run:  ~/.local/bin/hypr-binds-check
+# It fails loudly if a new upstream bind has stacked onto one of ours.
+#
+# Sourced AFTER bindings/apps.conf. Must remain the LAST bind-defining file
+# in the whole chain because of the passthrough submap at the bottom.
+
+
+# ─── Tiling: vim-style focus (SUPER + HJKL) ──────────────────────────
+# Costs us Omarchy's SUPER+J (togglesplit), SUPER+K (keybindings menu) and
+# SUPER+L (dwindle<->scrolling toggle). Replacements: togglesplit moves to
+# SUPER+CTRL+J, the keybindings menu to SUPER+CTRL+K. The scrolling-layout
+# toggle is not rebound — SUPER+ALT+L is free if you ever want it.
+unbind = SUPER, J
+unbind = SUPER, K
+unbind = SUPER, L
+bindd = SUPER, H, Move focus left, movefocus, l
+bindd = SUPER, J, Move focus down, movefocus, d
+bindd = SUPER, K, Move focus up, movefocus, u
+bindd = SUPER, L, Move focus right, movefocus, r
+bindd = SUPER CTRL, J, Toggle window split, layoutmsg, togglesplit
+
+# Swap with vim keys. Omarchy only ships the arrow-key versions (still live).
+bindd = SUPER SHIFT, H, Swap window left, swapwindow, l
+bindd = SUPER SHIFT, J, Swap window down, swapwindow, d
+bindd = SUPER SHIFT, K, Swap window up, swapwindow, u
+bindd = SUPER SHIFT, L, Swap window right, swapwindow, r
+
+# Close window. Omarchy's SUPER+W is left bound as a harmless second way out.
+bindd = SUPER, Q, Close window, killactive,
+
+# Fullscreen semantics are deliberately inverted vs Omarchy: the everyday key
+# is the tiled/bordered one, and true client fullscreen is reserved for games
+# (Elden Ring under gamescope needs `fullscreen 0`). See ~/notes/elden-ring-hdr-pause.md.
+unbind = SUPER, F
+unbind = SUPER CTRL, F
+bindd = SUPER, F, Fullscreen (tiled), fullscreenstate, 2 0
+bindd = SUPER CTRL, F, Fullscreen for games, fullscreen, 0
+
+# Layout selection, scoped to the active workspace only (not general:layout).
+# Omarchy's own toggle only cycles dwindle<->scrolling and would drop master.
+bindd = SUPER, M, Master layout (this workspace), exec, hypr-workspace-layout master
+bindd = SUPER, D, Dwindle layout (this workspace), exec, hypr-workspace-layout dwindle
+
+# movetoroot is a DWINDLE layoutmsg (it errors under master — verified 0.56.1).
+bindd = SUPER SHIFT, RETURN, Move to root (dwindle), layoutmsg, movetoroot
+
+
+# ─── Comma / period cluster: workspace + group navigation ────────────
+# SUPER+,/. walk workspaces on the focused monitor; SUPER+SHIFT+,/. walk
+# windows inside a group. This claims the whole comma cluster, so Omarchy's
+# five mako binds there are unbound — the notification family lives on
+# semicolon instead (below), laid out isomorphically to Omarchy's comma
+# scheme so upstream additions map across mechanically.
+unbind = SUPER, COMMA
+unbind = SUPER SHIFT, COMMA
+unbind = SUPER CTRL, COMMA
+unbind = SUPER ALT, COMMA
+unbind = SUPER SHIFT ALT, COMMA
+bindd = SUPER, COMMA, Previous workspace on monitor, workspace, m-1
+bindd = SUPER, PERIOD, Next workspace on monitor, workspace, m+1
+bindd = SUPER SHIFT, COMMA, Previous window in group, changegroupactive, b
+bindd = SUPER SHIFT, PERIOD, Next window in group, changegroupactive, f
+
+# Notifications — mako. Same modifier layout as Omarchy's comma family.
+bindd = SUPER, SEMICOLON, Dismiss last notification, exec, makoctl dismiss
+bindd = SUPER SHIFT, SEMICOLON, Dismiss all notifications, exec, makoctl dismiss --all
+bindd = SUPER CTRL, SEMICOLON, Toggle silencing notifications, exec, omarchy-toggle-notification-silencing
+bindd = SUPER ALT, SEMICOLON, Invoke last notification, exec, makoctl invoke
+bindd = SUPER SHIFT ALT, SEMICOLON, Restore last notification, exec, makoctl restore
+
+
+# ─── Menus: SPACE cluster is swapped vs Omarchy ──────────────────────
+# Omarchy puts the menu on SUPER+ALT+SPACE and the waybar toggle on
+# SUPER+SHIFT+SPACE. Long-standing muscle memory here is the reverse.
+unbind = SUPER SHIFT, SPACE
+unbind = SUPER ALT, SPACE
+bindd = SUPER SHIFT, SPACE, Omarchy menu, exec, omarchy-menu
+bindd = SUPER SHIFT, ESCAPE, Omarchy menu, exec, omarchy-menu
+bindd = SUPER ALT, SPACE, Toggle top bar, exec, omarchy-toggle-waybar
+
+# Omarchy's SUPER+K keybindings menu was taken by vim focus-up.
+bindd = SUPER CTRL, K, Search keybindings, exec, omarchy-menu-keybindings
+
+# Theme shortcuts that predate Omarchy's SUPER+CTRL+SPACE / +SHIFT+SPACE
+# menus. Kept as deliberate aliases — the Omarchy versions are also live.
+bindd = SUPER CTRL SHIFT, W, Next theme background, exec, omarchy-theme-bg-next
+bindd = SUPER CTRL SHIFT, T, Theme menu, exec, omarchy-menu theme
+
+# Power button locks rather than opening the power menu.
+unbind = , XF86PowerOff
+bindld = , XF86PowerOff, Lock screen, exec, loginctl lock-session
+
+
+# ─── Appearance policy ───────────────────────────────────────────────
+# All windows are fully opaque by policy (windowrules/base.conf); the
+# transparency toggle would fight it. Omarchy's gaps and square-aspect
+# toggles on SHIFT/CTRL+BACKSPACE are left alone.
+unbind = SUPER, BACKSPACE
+
+
+# ─── Screenshots: hyprshot, not omarchy-capture-screenshot ───────────
+# Deliberate — the stock satty flow is not wanted here.
+unbind = , PRINT
+bindd = , PRINT, Screenshot, exec, hyprshot -m region
+bindd = SUPER SHIFT, PRINT, Screenshot to work WSL, exec, {{ .chezmoi.homeDir }}/.local/bin/shot2work
+
+
+# ─── Wifi: absolute path to the local shadow is load-bearing ─────────
+# ~/.local/bin/omarchy-launch-wifi runs wlctl on NetworkManager. Omarchy's
+# stock script runs impala, which D-Bus-autostarts iwd — two supplicants on
+# the ath12k card wedged the firmware on 2026-07-15 (reboot-only recovery).
+# The absolute path removes any dependence on session PATH order.
+unbind = SUPER CTRL, W
+bindd = SUPER CTRL, W, Wifi controls, exec, {{ .chezmoi.homeDir }}/.local/bin/omarchy-launch-wifi
+
+
+# ─── Gaming / display (this machine only) ────────────────────────────
+bindd = SUPER CTRL, G, Toggle game mode, exec, gaming-mode
+bindd = SUPER CTRL, P, Pause/resume game (Elden Ring), exec, game-pause
+bindd = SUPER SHIFT, P, Toggle HDR mode (DP-1 only), exec, hdr-mode
+
+{{ if eq .formFactor "laptop" }}
+
+# ─── Laptop-only hardware ────────────────────────────────────────────
+bindd = SUPER SHIFT, I, Toggle internal keyboard, exec, toggle-internal-keyboard
+{{ end }}
+
+# ─── Passthrough submap ──────────────────────────────────────────────
+# Disables all Hyprland keybinds so keypresses flow to the focused
+# window. Use for xfreerdp3 / VMs / anything that wants full keyboard
+# capture. Toggle with SUPER+F12.
+#
+# Stuck? From a TTY or SSH:  hyprctl dispatch submap reset
+#
+# Must be the last thing in the last sourced bindings file — any
+# `bind = ...` that appears after `submap = passthrough` would be
+# swallowed into the submap instead of the global map.
+bind = SUPER, F12, submap, passthrough
+submap = passthrough
+bind = SUPER, F12, submap, reset
+submap = reset

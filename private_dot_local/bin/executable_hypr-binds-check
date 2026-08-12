@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Detect accidentally STACKED Hyprland keybinds.
+#
+# Since 2026-08-12 this machine sources Omarchy's stock keymap and layers
+# hypr-custom/bindings/overrides.conf on top. Hyprland does not replace a
+# bind when the same combo is bound twice — it runs BOTH dispatchers. So the
+# failure mode after moving the Omarchy pin is silent: upstream adds a bind
+# on a combo we already own, and now one keypress does two things.
+#
+# Run this after `git checkout <tag>` in ~/.local/share/omarchy, and after
+# any edit to overrides.conf. Exit 0 = clean.
+#
+# Dedup key is (submap, modmask, key, keycode, release, mouse): SUPER+F12
+# appears twice legitimately because the second is inside the passthrough
+# submap, and F9 twice because dictation is press+release.
+#
+# The key name is lowercased before comparison. Hyprland resolves keysyms
+# case-insensitively but stores them verbatim, so `SUPER, comma` and
+# `SUPER, COMMA` are the SAME bind while looking different in the JSON —
+# exactly the collision this script exists to catch.
+
+set -uo pipefail
+
+# Combos upstream deliberately stacks. "<submap>|<modmask>|<key>" — Omarchy
+# pairs cyclenext with bringactivetotop on ALT+TAB / ALT+SHIFT+TAB on purpose.
+ALLOWED=(
+  "|8|tab"
+  "|9|tab"
+)
+
+dupes=$(
+  hyprctl binds -j |
+    jq -r '.[] | [.submap, (.modmask|tostring), (.key|ascii_downcase),
+                  (.keycode|tostring), (.release|tostring), (.mouse|tostring)]
+                 | join("|")' |
+    sort | uniq -d
+)
+
+status=0
+while IFS= read -r combo; do
+  [[ -z $combo ]] && continue
+
+  # Strip the trailing keycode/release/mouse fields for the allowlist match.
+  short="${combo%|*|*|*}"
+  skip=0
+  for a in "${ALLOWED[@]}"; do
+    [[ $short == "$a" ]] && skip=1 && break
+  done
+  ((skip)) && continue
+
+  status=1
+  IFS='|' read -r submap modmask key _ <<<"$combo"
+  echo "STACKED: modmask=$modmask key=$key${submap:+ submap=$submap}"
+  hyprctl binds -j | jq -r --arg s "$submap" --arg m "$modmask" --arg k "$key" \
+    '.[] | select(.submap == $s and (.modmask|tostring) == $m
+                  and (.key|ascii_downcase) == $k)
+         | "    -> \(.dispatcher) \(.arg)   \"\(.description)\""'
+done <<<"$dupes"
+
+if ((status)); then
+  echo
+  echo "Fix: add an \`unbind\` in ~/.config/hypr-custom/bindings/overrides.conf"
+  echo "     (edit the chezmoi source, not the deployed file)."
+else
+  echo "OK: no stacked binds ($(hyprctl binds -j | jq length) total)."
+fi
+
+exit $status
