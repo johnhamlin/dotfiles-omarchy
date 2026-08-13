@@ -105,13 +105,40 @@ done
 
 hash_of() { sha256sum "$1" | cut -d' ' -f1; }
 
+# --- running a script on the dojo ---------------------------------------------
+#
+# NEVER carry the script on ssh's stdin (`ssh "$HOST" 'bash -s' <<'REMOTE'`).
+# On the dojo that SILENTLY TRUNCATES THE OUTPUT: the script runs to completion
+# remotely, but only what it printed before its first pause reaches us, and ssh
+# still exits 0. Measured 2026-08-13 -- `echo first; sleep 1; echo second`
+# delivered "first" only, while a parallel write to a file on the dojo proved
+# all three iterations of the equivalent loop had run. It bit the status probe
+# first: six of the seven files reported "remote-missing" while `ls` showed all
+# seven present, and "remote-missing" is the dangerous direction to be wrong in
+# -- it is the one state that does NOT trip the remote-ahead/conflict guard, so
+# a push would have cheerfully flattened dojo-side edits.
+#
+# Passing the script as an ARGUMENT is reliable (verified with the same sleep +
+# forks + pipelines that failed on stdin). base64 keeps arbitrary quoting intact
+# through the two shells this crosses -- ssh-entrypoint's `$SHELL "$@"` and the
+# `bash -c` it spawns. `</dev/null` guarantees nothing downstream can start
+# reading the channel again.
+#
+# The silence check further down already used the argument form, which is why
+# it kept working while the status probe lied.
+run_remote() { # script on OUR stdin, executed on the dojo
+  local b64
+  b64="$(base64 -w0)"
+  ssh "$HOST" "eval \"\$(printf %s '$b64' | base64 -d)\"" </dev/null
+}
+
 # --- gather the three sides ---------------------------------------------------
 
 # Remote hashes, one ssh for the lot. A missing file yields an empty hash, which
 # reads as "remote has nothing", not as a spurious difference. The paths are
 # %q-quoted into the heredoc so nothing is word-split on the far side.
 remote_hashes="$(
-  ssh "$HOST" "bash -s" <<REMOTE
+  run_remote <<REMOTE
 for p in $(printf '%q ' "${FILES[@]#*:}"); do
   if [ -f "\$HOME/\$p" ]; then
     printf '%s %s\n' "\$(sha256sum "\$HOME/\$p" | cut -d' ' -f1)" "\$p"
@@ -323,14 +350,14 @@ if [[ ${#DRY[@]} -eq 0 ]]; then
     manifest+="$(hash_of "$f")  ${f#"$STAGE"/}"$'\n'
   done < <(find "$STAGE" -type f -print0)
 
-  # The manifest travels as a base64 ENV VAR, not on stdin. `ssh 'bash -s'
-  # <<'REMOTE'` already spends stdin on the heredoc that carries the script, so
-  # piping the manifest in as well silently delivers nothing and the loop below
-  # backs up zero files -- which is exactly how the first version of this failed.
+  # The manifest travels base64'd INSIDE the script, not on stdin: stdin is not
+  # a usable channel here at all (see run_remote), and even before that it was
+  # already spent carrying the script -- piping the manifest in as well
+  # delivered nothing and backed up zero files, which is how the first version
+  # of this failed.
   manifest_b64=$(printf '%s' "$manifest" | base64 -w0)
 
-  ssh "$HOST" "PBS_MANIFEST_B64='$manifest_b64' bash -s" <<'REMOTE' \
-    || echo "   warn: pre-push backup step failed (continuing)" >&2
+  { printf "PBS_MANIFEST_B64='%s'\n" "$manifest_b64"; cat <<'REMOTE'
 set -u
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 root="$HOME/.local/share/pwn-bash-sync/backups"
@@ -354,6 +381,7 @@ fi
 # Keep the 10 newest snapshots; they are a few KB each.
 ls -1d "$root"/*/ 2>/dev/null | sort | head -n -10 | xargs -r rm -rf
 REMOTE
+  } | run_remote || echo "   warn: pre-push backup step failed (continuing)" >&2
 fi
 
 echo "==> pushing shell env -> $HOST"
