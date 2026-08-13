@@ -72,6 +72,60 @@ cp "$OVERRIDES/pwn.conf"      "$STAGE/.pwn.conf"
 cp "$OVERRIDES/gdbinit"       "$STAGE/.gdbinit"
 cp "$OVERRIDES/starship.toml" "$STAGE/.config/starship.toml"
 
+# ---------------------------------------------------------------------------
+# Snapshot anything we are about to overwrite that we did not write ourselves.
+#
+# This rsync clobbers six dotfiles in $HOME on the dojo with no undo. That is
+# safe against the stock image -- verified: the current dojo writes only
+# /etc/gdb/gdbinit.d/dojo.gdb, and the sole ~/.gdbinit in pwn.college's repos is
+# challenge-images/legacy/.gdbinit, which sources an /opt/pwndbg + /opt/splitmind
+# layout that does not exist on this nix-based box. It is NOT safe against hand
+# edits: on 2026-08-13 a GEF install attempt rewrote ~/.gdbinit, and the only
+# reason that was noticeable is that it left a dangling `source` line. A silent,
+# working hand-edit would have been erased without trace on the next sync.
+#
+# So: before writing, copy any target whose content differs from what we are
+# about to install into a timestamped backup dir on the dojo. One extra ssh,
+# hashes only, and it makes "what did I have before?" answerable.
+if [[ ${#DRY[@]} -eq 0 ]]; then
+  manifest=""
+  while IFS= read -r -d '' f; do
+    manifest+="$(sha256sum "$f" | cut -d' ' -f1)  ${f#"$STAGE"/}"$'\n'
+  done < <(find "$STAGE" -type f -print0)
+
+  # The manifest travels as a base64 ENV VAR, not on stdin. `ssh 'bash -s'
+  # <<'REMOTE'` already spends stdin on the heredoc that carries the script, so
+  # piping the manifest in as well silently delivers nothing and the loop below
+  # backs up zero files -- which is exactly how the first version of this failed.
+  manifest_b64=$(printf '%s' "$manifest" | base64 -w0)
+
+  ssh "$HOST" "PBS_MANIFEST_B64='$manifest_b64' bash -s" <<'REMOTE' \
+    || echo "   warn: pre-push backup step failed (continuing)" >&2
+set -u
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+root="$HOME/.local/share/pwn-bash-sync/backups"
+dir="$root/$stamp"
+saved=0
+while read -r want rel; do
+  [ -n "${rel:-}" ] || continue
+  target="$HOME/$rel"
+  [ -f "$target" ] || continue                  # nothing there = nothing to lose
+  have=$(sha256sum "$target" | cut -d' ' -f1)
+  [ "$have" = "$want" ] && continue             # identical: this push is a no-op
+  mkdir -p "$dir/$(dirname "$rel")"
+  cp -p "$target" "$dir/$rel"
+  saved=$((saved + 1))
+done <<< "$(printf '%s' "$PBS_MANIFEST_B64" | base64 -d)"
+if [ "$saved" -gt 0 ]; then
+  echo "   backed up $saved pre-existing file(s) -> ~/.local/share/pwn-bash-sync/backups/$stamp"
+else
+  rmdir "$dir" 2>/dev/null || true
+fi
+# Keep the 10 newest snapshots; they are a few KB each.
+ls -1d "$root"/*/ 2>/dev/null | sort | head -n -10 | xargs -r rm -rf
+REMOTE
+fi
+
 echo "==> pushing shell env -> $HOST"
 # No --delete: this writes only the staged files and must not touch anything
 # else in $HOME on the dojo.
