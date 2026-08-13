@@ -1,0 +1,103 @@
+# ~/.inputrc -- readline config. Managed by chezmoi.
+#
+# Ported from the pwn.college dojo setup (~/notes/pwn-college-nvim/overrides/
+# inputrc) so bash here behaves the way it does there: vi editing with a visible
+# mode indicator, prefix history search, fish-like menu completion.
+#
+# SCOPE WARNING -- the whole point, and the whole hazard:
+# this file applies to every READLINE APPLICATION on the box, not just to bash.
+# gdb, python, sqlite3, psql, mysql, bc and friends all read it. That is exactly
+# why it is worth having (gdb gets vi mode for free), and exactly what makes it
+# dangerous: anything BASH-SPECIFIC must be fenced behind `$if Bash` or it
+# silently breaks that key in every other tool. See magic-space at the bottom --
+# unfenced, it left the SPACEBAR DEAD in gdb.
+#
+# NOTE this file REPLACES /etc/inputrc rather than adding to it -- readline reads
+# exactly one: $INPUTRC, else ~/.inputrc, else /etc/inputrc. Arch's /etc/inputrc
+# is all `$if mode=emacs` (irrelevant here) apart from the four 8-bit settings
+# below, which are carried over verbatim so nothing is lost.
+#
+# NOTE ALSO that Omarchy's bash rc runs `bind -f ~/.local/share/omarchy/default/
+# bash/inputrc` AFTER this file is read, so its bindings land on top of these.
+# That is harmless *because* editing-mode is set here: by the time `bind -f`
+# runs the active keymap is already vi-insert, so Omarchy's unfenced binds
+# (Tab, arrows) go into vi-insert too rather than into an emacs keymap that vi
+# mode would then never consult. Do not move the mode switch into ~/.bashrc --
+# `set -o vi` there would run after `bind -f` and strand those bindings.
+
+# --- 8-bit / UTF-8 handling, carried from /etc/inputrc -----------------------
+set meta-flag on
+set input-meta on
+set convert-meta off
+set output-meta on
+
+# --- vi editing --------------------------------------------------------------
+set editing-mode vi
+
+# Vi mode indicator + cursor shape (the fish habit -- fish here is already
+# fish_vi_key_bindings, so this keeps bash consistent with it). Native readline,
+# bash >= 4.4; this box runs 5.3. \1..\2 wrap non-printing bytes so readline
+# computes the prompt width correctly.
+#   \e[6 q = beam cursor (insert)   \e[2 q = block cursor (normal)
+set show-mode-in-prompt on
+set vi-ins-mode-string "\1\e[6 q\e[38;5;114m\2I\1\e[0m\2 "
+set vi-cmd-mode-string "\1\e[2 q\e[38;5;215m\2N\1\e[0m\2 "
+
+# --- completion --------------------------------------------------------------
+# Case-insensitive, cycle matches with Tab (fish-like menu), colour the entries.
+set completion-ignore-case on
+set completion-map-case on
+set show-all-if-ambiguous on
+set show-all-if-unmodified on
+set menu-complete-display-prefix on
+set colored-completion-prefix on
+set colored-stats on
+set mark-symlinked-directories on
+set skip-completed-text on
+# Type indicator on completions (/ dirs, * executables, @ symlinks) -- tells you
+# at a glance whether that ELF is actually +x.
+set visible-stats on
+set page-completions off
+set completion-query-items 200
+set bell-style none
+
+$if mode=vi
+  set keymap vi-insert
+  # Prefix history search: type a prefix, Ctrl-P/N walks only matching lines.
+  "\C-p": history-search-backward
+  "\C-n": history-search-forward
+  # Same on Up/Down.
+  "\e[A": history-search-backward
+  "\e[B": history-search-forward
+  "\eOA": history-search-backward
+  "\eOB": history-search-forward
+  # Tab cycles the completion menu; Shift-Tab goes backward.
+  "\t": menu-complete
+  "\e[Z": menu-complete-backward
+  # Ctrl+Left / Ctrl+Right word motion (xterm and older encodings), so a long
+  # one-liner can be navigated without leaving insert mode.
+  "\e[1;5C": forward-word
+  "\e[1;5D": backward-word
+  "\e[5C": forward-word
+  "\e[5D": backward-word
+  # Home/End, which /etc/inputrc only bound under $if mode=emacs.
+  "\e[H": beginning-of-line
+  "\e[F": end-of-line
+  "\eOH": beginning-of-line
+  "\eOF": end-of-line
+  "\e[1~": beginning-of-line
+  "\e[4~": end-of-line
+  "\e[3~": delete-char
+
+  # Space expands history designators inline (!!, !$, !gcc) so you SEE what will
+  # run before pressing Enter instead of firing it blind.
+  #
+  # MUST stay fenced behind `$if Bash`. magic-space is a BASH-SPECIFIC readline
+  # function -- bash registers it into readline's funmap itself; it is not in
+  # readline core. Any other readline app (gdb, python, sqlite3, psql, bc)
+  # cannot resolve the name, and the binding then leaves the SPACEBAR DEAD.
+  # Unfenced, this made gdb reject `print 1` as: Undefined command: "print1".
+  $if Bash
+    " ": magic-space
+  $endif
+$endif

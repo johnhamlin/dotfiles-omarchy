@@ -21,3 +21,103 @@ fi
 
 # Pi
 export PATH="/home/john/.local/share/mise/installs/node/24.14.1/bin:$PATH"
+
+# =============================================================================
+# Interactive niceties, ported from the pwn.college dojo bash setup
+# (~/notes/pwn-college-nvim/overrides/bashrc). Full writeup: ~/notes/bash-vi-setup.md
+#
+# EVERYTHING BELOW ONLY EVER RUNS IN A *NESTED* BASH -- a top-level interactive
+# shell has already exec'd fish above. That is the point: this is the "if I ever
+# drop into bash" path, so it should feel like the fish/dojo setup rather than
+# like a bare shell.
+#
+# The readline half (vi mode, mode indicator, prefix history search, Tab menu
+# completion) lives in ~/.inputrc, NOT here, because it must be in force before
+# Omarchy's `bind -f` runs at line 20. Read the header of that file before
+# changing either.
+#
+# Omarchy's rc (line 20) already provides: histappend/HISTCONTROL/HISTSIZE,
+# bash-completion, eza aliases, fzf key bindings, starship, zoxide, mise.
+# Only the gaps are filled in here -- no duplication, no fighting it.
+# =============================================================================
+
+# --- history: fish-like depth, and no lost lines -----------------------------
+# Omarchy sets HISTSIZE=32768; go deeper and timestamp it. HISTCONTROL and
+# histappend are already set there and are not repeated.
+HISTSIZE=100000
+HISTFILESIZE=200000
+HISTTIMEFORMAT='%F %T '
+shopt -s cmdhist lithist # keep multi-line commands intact
+
+# --- editing / navigation ----------------------------------------------------
+# Redundant with `set editing-mode vi` in ~/.inputrc, and deliberately AFTER the
+# Omarchy source so it cannot strand Omarchy's `bind -f` bindings in an emacs
+# keymap. Kept because it also makes vi mode visible to `set -o` and to anything
+# that inspects $SHELLOPTS.
+set -o vi
+
+shopt -s autocd 2>/dev/null      # `..` or a bare dirname cd's, like fish
+shopt -s cdspell dirspell 2>/dev/null
+shopt -s globstar 2>/dev/null    # ** recursive glob
+shopt -s checkwinsize
+shopt -s checkjobs 2>/dev/null   # warn instead of silently killing stopped jobs
+shopt -s histreedit 2>/dev/null  # a failed !! stays on the line to fix
+
+# --- fzf ---------------------------------------------------------------------
+# Omarchy already sources /usr/share/fzf/{completion,key-bindings}.bash, so the
+# bindings exist; this is only the presentation. `?` toggles a preview of the
+# FULL command in the Ctrl-R history picker -- long one-liners run off the edge.
+export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border --info=inline'
+export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window down:4:hidden:wrap --bind '?:toggle-preview'"
+
+# --- heal a leaked terminal keyboard protocol before every prompt ------------
+#
+# Full-screen programs (nvim, fzf, any TUI) turn ON kitty's keyboard protocol
+# and/or xterm modifyOtherKeys, and turn it back off when they exit cleanly.
+# When one dies WITHOUT that cleanup -- SIGKILL, a dropped session, an OOM --
+# the mode stays on. The terminal then encodes Ctrl-C as an ESCAPE SEQUENCE
+# (^[[99;5u, or ^[[27;5;99~ in modifyOtherKeys form) instead of the 0x03 byte,
+# so the tty never sees INTR: Ctrl-C/Ctrl-D stop killing anything and the raw
+# code is printed instead.
+#
+# The mode belongs to the TERMINAL EMULATOR (this kitty window), not to any one
+# shell -- which is why it is worth healing from a nested bash too.
+#   CSI < u    pops the pushed kitty-protocol entry
+#   CSI > 4;0m disables xterm modifyOtherKeys
+__heal_kbd_protocol() { printf '\e[<u\e[>4;0m'; }
+
+# --- preserve output that does not end in a newline --------------------------
+#
+# Symptom: `printf X` with no trailing \n leaves NOTHING on screen -- the prompt
+# overwrites it. Confirmed on THIS machine from the raw byte stream (not
+# assumed): bash emits the prompt, then a bare CR, then the prompt AGAIN --
+#     X <prompt> \r <prompt>
+# and the second draw starts at column 0, covering the X. Newline-terminated
+# output is unaffected because \r\n already moved to a fresh line, which is why
+# this only ever shows up on partial lines. Bisected on the dojo to starship's
+# own PS1; not the locale, not prompt length, not show-mode-in-prompt.
+#
+# Rather than depend on readline's redisplay heuristic, guarantee the prompt
+# never starts on a dirty line -- exactly what zsh does with PROMPT_SP +
+# PROMPT_EOL_MARK, which bash has no equivalent of. Print an inverse-video mark
+# and pad to the terminal width: if the cursor was mid-line the pad runs past
+# the right margin and the terminal WRAPS, leaving the partial output intact on
+# the line above; if the cursor was already at column 0 the pad is simply
+# overwritten by the prompt and nothing changes visually.
+__preserve_partial_line() {
+  printf '\033[7m%%\033[0m%*s\r' "$(( ${COLUMNS:-80} - 1 ))" ''
+}
+
+# ORDER IS LOAD-BEARING -- append, never prepend.
+#
+# starship_precmd's first statement is `STARSHIP_CMD_STATUS=$?`, so ANYTHING
+# that runs before it in PROMPT_COMMAND replaces the exit status of the command
+# you actually ran, and the prompt's error indicator silently always reads
+# success. Appending keeps starship's status capture first; both hooks still run
+# before the prompt is drawn, which is all they need. `history -a` flushes each
+# command to the history file immediately so a new pane sees it (fish's shared
+# history behaviour) -- it does not care about $?, so it rides along here.
+PROMPT_COMMAND="${PROMPT_COMMAND:+${PROMPT_COMMAND}; }history -a; __heal_kbd_protocol; __preserve_partial_line"
+
+# Manual escape hatch for a terminal that somehow got past the heal above.
+alias fixterm='printf "\e[<u\e[>4;0m"; stty sane'
