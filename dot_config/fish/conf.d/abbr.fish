@@ -79,11 +79,10 @@ abbr -a -- nrd 'npm run dev'
 abbr -a -- nrs 'npm run start'
 abbr -a -- ni 'npm i'
 abbr -a -- p pnpm
-abbr -a -- pi 'pnpm install'
+abbr -a -- pin 'pnpm install'
 abbr -a -- pr 'pnpm run'
 abbr -a -- prd 'pnpm run dev'
 abbr -a -- prs 'pnpm run start'
-{{ if not (contains "microsoft" .chezmoi.kernel.osrelease) -}}
 # Kitty kittens (desktop only)
 abbr -a -- kssh 'kitty +kitten ssh'
 abbr -a -- ksshg 'kitty +kitten ssh gram'
@@ -97,7 +96,6 @@ abbr -a -- khints 'kitty +kitten hints'
 abbr -a -- kunicode 'kitty +kitten unicode_input'
 abbr -a -- kfonts 'kitty +kitten choose-fonts'
 abbr -a -- kfiles 'kitty +kitten choose-files'
-{{ end -}}
 abbr -a -- cl claude
 abbr -a -- clc "claude -c"
 abbr -a -- pg 'pgcli -h localhost -p 5432 -U postgres'

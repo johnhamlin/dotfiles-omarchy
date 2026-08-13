@@ -94,6 +94,7 @@ FILES=(
   "bash_profile:.bash_profile"
   "pwn.conf:.pwn.conf"
   "gdbinit:.gdbinit"
+  "gef.rc:.gef.rc"
   "starship.toml:.config/starship.toml"
 )
 

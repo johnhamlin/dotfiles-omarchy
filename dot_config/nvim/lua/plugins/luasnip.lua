@@ -10,9 +10,15 @@ return {
 
     local s = ls.snippet
     local t = ls.text_node
+    local i = ls.insert_node
 
     ls.add_snippets("racket", {
       s("bsl", { t("#lang htdp/bsl") }),
+    })
+
+    -- python code cell for notebooks (jupytext markdown buffers)
+    ls.add_snippets("markdown", {
+      s("py", { t({ "```python", "" }), i(1), t({ "", "```" }) }),
     })
 
     -- Optional: a key to "finish" a snippet and remove markers immediately
