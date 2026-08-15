@@ -166,6 +166,21 @@ local function man_lookup()
   vim.notify("no man page for '" .. word .. "'", vim.log.levels.WARN)
 end
 
+-- Two incompatible tools share the name `checksec`: the Go rewrite (Arch
+-- extra/checksec) takes `checksec file <bin>`, while pwntools' `pwn checksec`
+-- (the dojo) and the classic slimm609 script take `checksec --file=<bin>`.
+-- Only the cobra-based Go one prints "Available Commands" in --help; probe
+-- once and cache.
+local checksec_flag
+local function checksec_argform(esc)
+  if checksec_flag == nil then
+    local h = vim.system({ "checksec", "--help" }, { text = true }):wait()
+    checksec_flag = ((h.stdout or "") .. (h.stderr or "")):find("Available Commands", 1, true) and "subcmd"
+      or "flag"
+  end
+  return checksec_flag == "subcmd" and ("checksec file " .. esc) or ("checksec --file=" .. esc)
+end
+
 local function checksec()
   if vim.fn.executable("checksec") == 0 then
     vim.notify("checksec not installed (pacman -S checksec)", vim.log.levels.WARN)
@@ -180,7 +195,7 @@ local function checksec()
     vim.notify("nothing to inspect at " .. target, vim.log.levels.WARN)
     return
   end
-  term("checksec --file=" .. vim.fn.shellescape(target) .. " ; echo ; read -n1 -p 'enter to close'")
+  term(checksec_argform(vim.fn.shellescape(target)) .. " ; echo ; read -n1 -p 'enter to close'")
 end
 
 local function debug_current()
