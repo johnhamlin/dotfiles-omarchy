@@ -202,6 +202,19 @@ This is where Neovim matches (and often beats) IntelliJ:
 | Cycle hover source | **`Ctrl+n`** / **`Ctrl+p`** | Same word, next source — e.g. clangd docs → `printf(3)` man page |
 | Promote hover to split | **`<leader>kh`** | Move the float into a real split (man pages keep their `q`/jump maps) |
 
+### pwn/CTF layer — `<leader>k` (shared with the dojo)
+
+| Action | Keybinding | Notes |
+|---|---|---|
+| Build C (pwn flags) | **`<leader>kb`** | `gcc -g -O0 -no-pie -fno-stack-protector -z execstack`; override `vim.g.pwn_cflags` |
+| Run current file | **`<leader>kr`** | python→python3, c/cpp→build+exec, sh→bash, in a snacks terminal |
+| Man page for word | **`<leader>km`** | `:Man` on `<cword>`, section 2→3→any (syscall/libc lookup) |
+| Toggle hex view | **`<leader>kx`** | `xxd` round-trip; ELF/NUL blobs auto-open as hex |
+| checksec | **`<leader>kc`** | Mitigations on the binary (or a C buffer's compiled artifact) |
+| Debug | **`<leader>kg`** | `pwndbg` if present, else `gdb`, on the binary |
+
+**pwntools snippets** (python, expand + `<Tab>`): `pwn` (full exploit skeleton), `pwnh`, `ru`, `sla`, `sl`, `p64`, `u64`, `cyc`, `cycf`, `rop`, `gdba`, `fmt`.
+
 **The workflow:** `gd` into something, read it, `Ctrl+o` back. `gd` deeper, `Ctrl+o` `Ctrl+o` back two levels. Think of it like a browser's back button.
 
 ---
