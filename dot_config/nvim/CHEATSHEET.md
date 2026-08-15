@@ -197,6 +197,9 @@ This is where Neovim matches (and often beats) IntelliJ:
 | Incoming calls | **`gai`** | Who calls this function? |
 | Outgoing calls | **`gao`** | What does this function call? |
 | Rename symbol | **`<leader>cr`** | Rename across all files (inc-rename with preview) |
+| Hover docs | **`K`** | Multi-source via hover.nvim: LSP docs, diagnostics, man pages |
+| Enter hover float | **`K K`** | Focus the float (`gd` inside jumps to symbol; `K` again returns) |
+| Cycle hover source | **`Ctrl+n`** / **`Ctrl+p`** | Same word, next source — e.g. clangd docs → `printf(3)` man page |
 
 **The workflow:** `gd` into something, read it, `Ctrl+o` back. `gd` deeper, `Ctrl+o` `Ctrl+o` back two levels. Think of it like a browser's back button.
 
