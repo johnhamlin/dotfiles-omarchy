@@ -28,8 +28,10 @@ bind -M insert \cy accept-autosuggestion
 # Ctrl+. to accept next WORD of autosuggestion
 bind -M insert ctrl-. forward-bigword
 
-# fzf process search on Ctrl+Alt+K (default Ctrl+Alt+P conflicts with Fcitx5 preedit)
-fzf_configure_bindings --processes=\e\ck
+# fzf file/dir search on Ctrl+T (upstream-fzf muscle memory; fzf.fish's default
+# is Ctrl+Alt+F). Process search on Ctrl+Alt+K (its default Ctrl+Alt+P conflicts
+# with Fcitx5 preedit). One call reinstalls all bindings, so both live here.
+fzf_configure_bindings --processes=\e\ck --directory=\ct
 
 # Disable flow control so Ctrl+S works, then bind to sudo toggle
 stty -ixon 2>/dev/null
