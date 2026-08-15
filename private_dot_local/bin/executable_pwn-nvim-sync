@@ -339,6 +339,7 @@ require_override() {
 if [[ "$VERIFY_ONLY" -eq 0 ]]; then
   echo "==> staging nvim config"
   for f in \
+    "$OVERRIDES/init.lua" \
     "$OVERRIDES/lua/config/lazy.lua" \
     "$OVERRIDES/lua/config/options.lua" \
     "$OVERRIDES/lua/plugins/zz-pwn-offline.lua" \
@@ -350,6 +351,7 @@ if [[ "$VERIFY_ONLY" -eq 0 ]]; then
   # Base config into the staging dir, minus the dropped specs.
   rsync -a "${CONFIG_EXCLUDES[@]}" "$CFG/" "$STAGE/"
   # Layer the dojo-only overrides on top (these win).
+  cp "$OVERRIDES/init.lua"                       "$STAGE/init.lua"
   cp "$OVERRIDES/lua/config/lazy.lua"            "$STAGE/lua/config/lazy.lua"
   cp "$OVERRIDES/lua/config/options.lua"         "$STAGE/lua/config/options.lua"
   cp "$OVERRIDES/lua/plugins/zz-pwn-offline.lua" "$STAGE/lua/plugins/zz-pwn-offline.lua"
