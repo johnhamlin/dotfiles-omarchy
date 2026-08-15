@@ -38,6 +38,27 @@ return {
         end,
         desc = "Hover (previous source)",
       },
+      {
+        "<leader>kh",
+        function()
+          local cur = vim.api.nvim_get_current_win()
+          local float = vim.w.hover_preview and cur or vim.b.hover_preview
+          if not (float and vim.api.nvim_win_is_valid(float)) then
+            return vim.notify("no hover float open", vim.log.levels.INFO)
+          end
+          -- Move the float's buffer into a split instead of copying lines:
+          -- a man float keeps its Man ftplugin maps, an LSP float its
+          -- markdown treesitter. bufhidden=wipe would kill the buffer at
+          -- win_close, so lift it for the handover and restore after.
+          local buf = vim.api.nvim_win_get_buf(float)
+          vim.bo[buf].bufhidden = "hide"
+          vim.api.nvim_win_close(float, true)
+          vim.cmd("split")
+          vim.api.nvim_win_set_buf(0, buf)
+          vim.bo[buf].bufhidden = "wipe"
+        end,
+        desc = "Promote hover to split",
+      },
     },
     opts = {
       providers = {
