@@ -121,3 +121,4 @@ PROMPT_COMMAND="${PROMPT_COMMAND:+${PROMPT_COMMAND}; }history -a; __heal_kbd_pro
 
 # Manual escape hatch for a terminal that somehow got past the heal above.
 alias fixterm='printf "\e[<u\e[>4;0m"; stty sane'
+. "$HOME/.cargo/env"
