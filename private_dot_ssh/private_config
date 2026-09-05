@@ -8,6 +8,11 @@ Host tp
     User john
     IdentityFile ~/.ssh/id_ed25519
 
+Host pwn
+  HostName dojo.pwn.college
+  User hacker
+  IdentityFile ~/.ssh/pwn-college-key
+
 # === Work laptop SSH (BT-LW1180) ===========================================
 # Inbound to BT-LW1180 always hits sshjohn at the wire level — sshd cannot
 # authenticate AAD users (~/notes/work-laptop-ssh-aad.md explains why). The
