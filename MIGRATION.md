@@ -138,10 +138,14 @@ chezmoi-managed configs source; Omarchy's own installer is never run. Full desig
     gpg --import /path/to/backup/private-key.asc   # if needed
     ```
 
-14. **Webapps + mimetypes** (recreate via `omarchy-webapp-install`; imv/mpv defaults):
+14. **Desktop AI apps, webapps + mimetypes** (imv/mpv defaults):
     ```bash
     bash ~/.local/share/omarchy/install/config/mimetypes.sh   # inspect first
-    # omarchy-webapp-install per app (chatgpt/claude/gmail/teams/work-email/youtube/youtube-music)
+    sudo pacman -S --needed chatgpt-desktop-bin claude-desktop
+    # Desktop apps: SUPER+SHIFT+A = ChatGPT; SUPER+SHIFT+CTRL+A = Claude.
+    # Preserve the chezmoi claude-desktop libsecret wrapper.
+    # Do not recreate ChatGPT or Claude webapp launchers.
+    # omarchy-webapp-install per app (gmail/teams/work-email/youtube/youtube-music)
     # teams keeps --ozone-platform=x11 in its .desktop Exec
     ```
 
