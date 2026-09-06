@@ -1,0 +1,7 @@
+[Unit]
+Description=Shared administration knowledge health and pending publication
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 -I /home/john/.local/share/ops-admin/launcher.py maintenance
+TimeoutStartSec=100

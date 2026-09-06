@@ -1,0 +1,8 @@
+[Unit]
+Description=Snapshot shared administration knowledge and replicate where configured
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 -I /home/john/.local/share/ops-admin/launcher.py backup-create
+ExecStart=/usr/bin/python3 -I /home/john/.local/share/ops-admin/launcher.py backup-replicate
+TimeoutStartSec=300
