@@ -5,16 +5,16 @@ description: >
   window rules, keybindings, monitors, gaps, borders, opacity, waybar, walker,
   mako, terminal config, themes, wallpaper, night light, idle/lock behavior,
   screenshots, reminders, or any omarchy-* command. This is a CachyOS + pinned
-  Omarchy 3.8.4 HYBRID — the stock Omarchy skill's advice is wrong here in
-  load-bearing ways. Read this before editing anything under ~/.config/.
+  Omarchy 3.8.5 (`f4378f0d`) HYBRID — the stock Omarchy skill's advice is wrong
+  here in load-bearing ways. Read this before editing anything under ~/.config/.
 ---
 
 # Omarchy on beast-cachy (CachyOS hybrid) — adapted skill
 
-**This is NOT a stock Omarchy machine.** It is CachyOS with Omarchy 3.8.4 as a
-*pinned, never-updated* desktop layer, migrated from HyDE on 2026-07-14. The
-upstream skill this file replaces assumes a stock install; following it here
-breaks the machine's config management. Authoritative references:
+**This is NOT a stock Omarchy machine.** It is CachyOS with Omarchy 3.8.5
+(untagged commit `f4378f0d`) as a manually pinned desktop layer, migrated from
+HyDE on 2026-07-14. The upstream skill this file replaces assumes a stock
+install; following it here breaks the machine's config management. Authoritative references:
 `~/notes/omarchy-migration-2026-07.md`, `~/notes/CLAUDE.md` (ownership map).
 
 ## Rule 0 — chezmoi owns the config layer
@@ -44,7 +44,8 @@ git -C ~/.local/share/chezmoi add -A && git -C ~/.local/share/chezmoi commit
 `~/.claude/skills/omarchy/` (this file).
 
 **Omarchy-owned, never edit** (reading is encouraged):
-`~/.local/share/omarchy` (pinned v3.8.4 clone — parts catalog),
+`~/.local/share/omarchy` (pinned at untagged commit `f4378f0d`, Omarchy 3.8.5
+— parts catalog),
 `~/.config/omarchy/current/` (theme output), `~/.local/state/omarchy/`
 (toggle flags).
 
@@ -67,11 +68,13 @@ git -C ~/.local/share/chezmoi add -A && git -C ~/.local/share/chezmoi commit
 
 ```bash
 git -C ~/.local/share/omarchy fetch --tags
-git -C ~/.local/share/omarchy diff v3.8.4..<new-tag> -- migrations/   # review EVERY script
+git -C ~/.local/share/omarchy diff f4378f0d..<candidate-ref> -- migrations/   # review EVERY script
 # apply wanted changes selectively by hand, then move the pin:
-git -C ~/.local/share/omarchy checkout <new-tag>
+git -C ~/.local/share/omarchy checkout <reviewed-commit-or-tag>
 ```
-Anything touching boot/pacman/NVIDIA/NetworkManager in a migration is skipped,
+The current 3.8.5 pin is untagged. Diff from its exact commit, and never select
+the menu's Omarchy To Quattro action or run `omarchy-upgrade-to-quattro`.
+Anything touching boot/pacman/NVIDIA/NetworkManager in a migration is skipped
 always. `iommu=pt` must be on `/proc/cmdline` at every checkpoint.
 
 ## Keybindings — this machine's architecture (reworked 2026-08-12)
@@ -102,7 +105,9 @@ John's delta lives in chezmoi at
   remain the LAST bind-defining content in the whole source chain.
 - `bindd = MODS, KEY, Description, dispatcher, args` is the house format.
 - View current map: `omarchy menu keybindings --print` or SUPER+CTRL+K.
-  Correct count is **205**.
+  The latest documented count is **208 on 2026-09-05**; 205 was the
+  2026-08-12 audit count. Treat 208 as a dated observation, not a live count,
+  until `~/.local/bin/hypr-binds-check` is run in an authorized desktop session.
 - Notable non-stock choices: vim SUPER+H/J/K/L focus (so SUPER+CTRL+J is
   togglesplit and SUPER+CTRL+K the keybindings menu), SUPER+Q close,
   SUPER+F/SUPER+CTRL+F fullscreen semantics inverted for gamescope,
