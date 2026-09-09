@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Waybar module: worst AI coding quota across all providers OpenQuota tracks.
+
+Reads OpenQuota's SQLite snapshot cache read-only. OpenQuota (the Tauri app)
+is what refreshes it, so this module shows nothing when that app is not
+running. There is no CLI or HTTP API upstream -- `provider_snapshots` is an
+INTERNAL schema and may change across OpenQuota releases; re-check after any
+version bump. Never write to this database.
+
+Thresholds mirror OpenQuota's own tray gauge (src-tauri/src/tray_icon.rs):
+>80% used = critical, >40% used = caution.
+"""
+
+import json
+import sqlite3
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+DB = Path.home() / ".local/share/io.github.deviffyy.openquota/openquota.db"
+ICON = "\U000f04c5"  # nf-md-speedometer
+CAUTION_AT = 40.0
+CRITICAL_AT = 80.0
+
+
+def connect():
+    """Read-only connection. Falls back to immutable when the -shm/-wal pair is
+    absent (OpenQuota not running), which a plain mode=ro open cannot handle."""
+    for uri in (f"file:{DB}?mode=ro", f"file:{DB}?immutable=1"):
+        try:
+            return sqlite3.connect(uri, uri=True, timeout=2.0)
+        except sqlite3.Error:
+            continue
+    return None
+
+
+def local_reset(iso):
+    if not iso:
+        return ""
+    try:
+        stamp = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return ""
+    delta = stamp - datetime.now(timezone.utc)
+    if delta.total_seconds() < 0:
+        return "due"
+    if delta.days >= 1:
+        return stamp.strftime("%b %-d")
+    return stamp.strftime("%H:%M")
+
+
+def main():
+    if not DB.exists():
+        print(json.dumps({"text": ""}))
+        return
+
+    conn = connect()
+    if conn is None:
+        print(json.dumps({"text": ""}))
+        return
+
+    try:
+        rows = conn.execute(
+            "SELECT provider_id, payload FROM provider_snapshots"
+        ).fetchall()
+    except sqlite3.Error:
+        print(json.dumps({"text": ""}))
+        return
+    finally:
+        conn.close()
+
+    worst = None
+    sections = []
+
+    for provider_id, payload in sorted(rows):
+        try:
+            snap = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+
+        quotas = [q for q in snap.get("quotas", []) if q.get("usedPercent") is not None]
+        if not quotas:
+            continue
+
+        plan = snap.get("plan") or ""
+        header = provider_id.title()
+        if plan:
+            header += f" — {plan}"
+        lines = [header]
+
+        for quota in quotas:
+            used = float(quota["usedPercent"])
+            if worst is None or used > worst:
+                worst = used
+            resets = local_reset(quota.get("resetsAt"))
+            label = quota.get("label", quota.get("id", "?"))
+            tail = f"   resets {resets}" if resets else ""
+            lines.append(f"  {label:<14}{used:>3.0f}%{tail}")
+
+        sections.append("\n".join(lines))
+
+    if worst is None:
+        print(json.dumps({"text": ""}))
+        return
+
+    if worst >= CRITICAL_AT:
+        css = "critical"
+    elif worst >= CAUTION_AT:
+        css = "caution"
+    else:
+        css = "ok"
+
+    print(
+        json.dumps(
+            {
+                "text": f"{ICON} {worst:.0f}%",
+                "tooltip": "\n\n".join(sections),
+                "class": css,
+            }
+        )
+    )
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:  # waybar must never see a traceback on stdout
+        print(json.dumps({"text": ""}))
+        sys.exit(0)
