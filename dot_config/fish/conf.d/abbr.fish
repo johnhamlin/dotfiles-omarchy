@@ -99,3 +99,6 @@ abbr -a -- clc "claude -c"
 abbr -a -- pg 'pgcli -h localhost -p 5432 -U postgres'
 abbr -a -- pss 'ps aux | grep -i'
 abbr -a -- gg lazygit
+
+# work laptop (BT-LW1180) — SSH chain via Tailscale, see ~/.ssh/config
+abbr -a -- wk 'ssh work'

@@ -1,8 +1,12 @@
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
-# Disable default greeting
+# overwrite greeting
+# potentially disabling fastfetch
 function fish_greeting
+    # smth smth
 end
+
+status is-interactive; and theme_tokyonight night
 
 # Use nvim to read man pages
 set -gx MANPAGER "nvim +Man!"
@@ -13,10 +17,15 @@ bind -M insert \cn history-prefix-search-forward
 bind \cp history-prefix-search-backward
 bind \cn history-prefix-search-forward
 
-# Ctrl+. to accept next word of autosuggestion (requires kitty keybind)
-bind -M insert \e\[46\;5u forward-word
+# Ctrl+Y to accept full autosuggestion
+bind -M insert \cy accept-autosuggestion
+bind \cy accept-autosuggestion
 
-# fzf process search on Ctrl+Alt+K (default Ctrl+Alt+P conflicts with Fcitx5 preedit)
+# Ctrl+. to accept next WORD of autosuggestion (requires kitty keybind)
+bind -M insert \e\[46\;5u forward-bigword
+bind \e\[46\;5u forward-bigword
+
+# Re-enable fzf process search (omarchy disables it, Ctrl+Alt+P conflicts with Fcitx5 preedit)
 fzf_configure_bindings --processes=\e\ck
 
 # Disable flow control so Ctrl+S works, then bind to sudo toggle
