@@ -13,6 +13,18 @@ Host pwn
   User hacker
   IdentityFile ~/.ssh/pwn-college-key
 
+Host openwrt
+HostName 10.10.10.1
+User root
+IdentityFile ~/.ssh/id_ed25519_openwrt
+IdentitiesOnly yes
+
+# CoreElec
+Host ce
+  HostName 10.10.10.30
+  User root
+  IdentityFile ~/.ssh/id_ed25519-mbp
+
 # === Work laptop SSH (BT-LW1180) ===========================================
 # Inbound to BT-LW1180 always hits sshjohn at the wire level — sshd cannot
 # authenticate AAD users (~/notes/work-laptop-ssh-aad.md explains why). The
