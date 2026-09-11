@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Waybar module: worst AI coding quota across all providers OpenQuota tracks.
+"""Waybar module: per-provider AI coding quotas from OpenQuota.
 
 Reads OpenQuota's SQLite snapshot cache read-only. OpenQuota (the Tauri app)
 is what refreshes it, so this module shows nothing when that app is not
@@ -71,6 +71,7 @@ def main():
 
     worst = None
     sections = []
+    summaries = []
 
     for provider_id, payload in sorted(rows):
         try:
@@ -97,6 +98,17 @@ def main():
             tail = f"   resets {resets}" if resets else ""
             lines.append(f"  {label:<14}{used:>3.0f}%{tail}")
 
+        primary = {q.get("id"): q for q in quotas}
+        brief = []
+        for quota_id, short in (("session", "S"), ("weekly", "W")):
+            if quota_id in primary:
+                used = float(primary[quota_id]["usedPercent"])
+                brief.append(f"{short}:{used:.0f}%")
+        if not brief:
+            # Keep providers with only model-specific quotas visible, too.
+            used = max(float(q["usedPercent"]) for q in quotas)
+            brief.append(f"{used:.0f}%")
+        summaries.append(f"{provider_id.title()} {' '.join(brief)}")
         sections.append("\n".join(lines))
 
     if worst is None:
@@ -113,7 +125,7 @@ def main():
     print(
         json.dumps(
             {
-                "text": f"{ICON} {worst:.0f}%",
+                "text": f"{ICON} " + " | ".join(summaries),
                 "tooltip": "\n\n".join(sections),
                 "class": css,
             }
