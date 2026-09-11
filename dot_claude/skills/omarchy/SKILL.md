@@ -196,11 +196,6 @@ Useful groups: `theme`, `toggle` (nightlight/idle/screensaver/suspend),
 
 ## Environment quirks for agents on this machine
 
-- Claude Code sessions: the RTK hook rewrites commands. Two traps:
-  (1) bare `sudo <cmd>` becomes `sudo rtk <cmd>` and fails — use absolute
-  paths (`sudo /usr/bin/tee`); (2) rtk's output filter can silently corrupt
-  piped output (once rendered a real `diff` as "identical", once truncated a
-  `grep | tee` write) — for verification-grade output use `rtk proxy <cmd>`.
 - Claude Code cannot sudo interactively: ask John to run `sudo -v` first.
 - Never run bare `chezmoi apply` in subagents (TTY prompt on unrelated drift);
   always target explicit paths.
