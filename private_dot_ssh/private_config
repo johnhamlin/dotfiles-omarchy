@@ -23,7 +23,7 @@ IdentitiesOnly yes
 Host ce
   HostName 10.10.10.30
   User root
-  IdentityFile ~/.ssh/id_ed25519-mbp
+  IdentityFile ~/.ssh/id_ed25519
 
 # === Work laptop SSH (BT-LW1180) ===========================================
 # Inbound to BT-LW1180 always hits sshjohn at the wire level — sshd cannot
