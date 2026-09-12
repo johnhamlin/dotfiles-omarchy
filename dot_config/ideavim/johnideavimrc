@@ -74,6 +74,11 @@ sethandler <C-6> a:vim
 sethandler <C-Space> a:ide n-v:vim
 sethandler <C-S-Space> a:ide
 
+" Built-in IdeaVim UI navigation (AceJump already installed).
+" In docked tool windows: Ctrl-W then h/j/k/l. Esc returns to editor.
+" Ctrl-Shift-Backslash shows UI target hints.
+set VimEverywhere
+
 " Keep both existing explorer entry points; NERDTree opens/focuses Project view.
 nmap <leader>e :NERDTree<CR>
 nmap // :NERDTree<CR>
