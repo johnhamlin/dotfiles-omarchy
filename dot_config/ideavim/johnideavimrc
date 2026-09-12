@@ -1,29 +1,125 @@
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-" My custom overrides and additions to 
-" https://github.com/johnhamlin/lazy-idea/tree/main?tab=readme-ov-file
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+" John's LazyVim muscle memory. Loaded AFTER unmodified cufarvid/lazy-idea.
+" Edit chezmoi source, apply this file, then restart IDE for a clean mapping reload.
+" Space = leader. Full mapping/limitations sheet: ~/notes/jetbrains-lazyvim/README.md
 
+" Normal-mode line navigation (leave visual and operator H/L alone).
+nnoremap H ^
+nnoremap L $
+nnoremap <S-h> ^
+nnoremap <S-l> $
+let g:WhichKeyDesc_buffer_prev = "H First Nonblank"
+let g:WhichKeyDesc_buffer_next = "L End of Line"
+
+" References moved to Space r; gr is replacement, as in mini.operators.
 set ReplaceWithRegister
-set mini-ai
+nmap gr <Plug>ReplaceWithRegisterOperator
+nmap grr <Plug>ReplaceWithRegisterLine
+xmap gr <Plug>ReplaceWithRegisterVisual
+nmap <leader>r <Action>(FindUsages)
+let g:WhichKeyDesc_references = "<leader>r References"
+let g:WhichKeyDesc_replace = "gr Replace with Register"
+let g:WhichKeyDesc_replace_line = "grr Replace Line with Register"
+
+" mini.operators exchange approximation (same editor only).
+set exchange
+nmap gx <Plug>(Exchange)
+nmap gxx <Plug>(ExchangeLine)
+nmap gxc <Plug>(ExchangeClear)
+xmap gx <Plug>(Exchange)
+" Remove extension defaults so visual X still deletes whole lines.
+silent! nunmap cx
+silent! nunmap cxx
+silent! nunmap cxc
+silent! xunmap X
+let g:WhichKeyDesc_exchange = "gx Exchange"
+let g:WhichKeyDesc_exchange_line = "gxx Exchange Line"
+let g:WhichKeyDesc_exchange_cancel = "gxc Cancel Exchange"
+
+" Existing personal extensions. These need their Marketplace plugins.
 set dial
 set peekaboo
+" AnyObject default d/g/o/u meanings conflict with LazyVim mini.ai.
+" Restrict it to arguments/functions/classes; upstream owns q/b/g text objects.
+let g:anyobject_included = "anyArgument,anyFunction,anyClass"
+set anyobject
+let g:highlightedyank_highlight_duration = "150"
 
-" let g:WhichKeyDesc_buffer_prev = "<S-h> Prev Buffer"
-nmap <S-h> ^
-" let g:WhichKeyDesc_buffer_next = "<S-l> Next Buffer"
-nmap <S-l> $
-
-let g:WhichKeyDesc_window_down = "<C-j> Call Inline Code Completion"
+" Normal-mode splits; retain IDE-only insert Ctrl-j completion and Ctrl-k signature help.
+sethandler <C-h> a:ide n-i:vim
+sethandler <C-j> a:ide n-i:vim
+sethandler <C-k> a:ide n-i:vim
+sethandler <C-l> a:ide n:vim
 imap <C-j> <Action>(CallInlineCompletionAction)
+" Upstream insert Ctrl-k invokes ParameterInfo.
+" Ctrl-y is built-in IdeaVim lookup accept; otherwise Vim's normal insert fallback.
+sethandler <C-y> a:vim
+sethandler <C-e> a:vim
+sethandler <C-a> a:vim
+sethandler <C-x> a:vim
+sethandler <C-d> a:vim
+sethandler <C-b> a:vim
+sethandler <C-f> a:vim
+sethandler <C-v> a:vim
+sethandler <C-u> a:vim
+sethandler <C-o> a:vim
+sethandler <C-i> a:vim
+sethandler <C-r> a:vim
+sethandler <C-w> a:vim
+sethandler <C-s> a:vim
+nmap <C-s> <Action>(SaveAll)
+imap <C-s> <Esc><Action>(SaveAll)
+xmap <C-s> <Esc><Action>(SaveAll)
+sethandler <C-6> a:vim
+" Completion and live-template popup are native in insert mode.
+sethandler <C-Space> a:ide n-v:vim
+sethandler <C-S-Space> a:ide
 
-" Code Navigation
-let g:WhichKeyDesc_references = "<leader>r References"
-nmap <leader>r <Action>(FindUsages)
-
-set NERDTree
-let g:WhichKeyDesc_explorer = "<leader>e Explorer NERDTree"
+" Keep both existing explorer entry points; NERDTree opens/focuses Project view.
 nmap <leader>e :NERDTree<CR>
 nmap // :NERDTree<CR>
+let g:WhichKeyDesc_explorer = "<leader>e Explorer"
+let g:WhichKeyDesc_explorer_slash = "// Explorer"
 
-set highlightedyank
-let g:highlightedyank_highlight_duration = "150"
+" File structure vs project symbols, like Space ss / sS in LazyVim.
+nmap <leader>ss <Action>(FileStructurePopup)
+let g:WhichKeyDesc_search_symbol = "<leader>ss File Structure"
+nmap K <Action>(QuickJavaDoc)
+let g:WhichKeyDesc_hover = "K Quick Documentation"
+" IDE indexing controls visibility; this cannot force indexing excluded files.
+nmap <leader>fI <Action>(GotoFile)
+let g:WhichKeyDesc_files_ignored = "<leader>fI Find File (IDE Indexed Files)"
+
+" Diffview approximations. Native dialogs retain their normal context/scope.
+nmap <leader>gd <Action>(ActivateVersionControlToolWindow)
+nmap <leader>gD <Action>(Git.CompareWithBranch)
+nmap <leader>gc <Action>(Vcs.ShowTabbedFileHistory)
+nmap <leader>gC <Action>(Vcs.Show.Log)
+let g:WhichKeyDesc_git_diff = "<leader>gd Local Changes (Select Files to Diff)"
+let g:WhichKeyDesc_git_branch_diff = "<leader>gD Compare File/Selection with Branch"
+let g:WhichKeyDesc_git_commits = "<leader>gc File Commit History"
+let g:WhichKeyDesc_git_branch_history = "<leader>gC Git Log (Choose Branch Filter)"
+" No global Space gq: CloseContent could close a source editor instead of a diff.
+
+" Harpoon approximation: choose a numbered bookmark rather than append a file.
+nmap <leader>H <Action>(ToggleBookmarkWithMnemonic)
+nmap <leader>h <Action>(ShowBookmarks)
+let g:WhichKeyDesc_bookmark_add = "<leader>H Set Bookmark (Choose 1-9)"
+let g:WhichKeyDesc_bookmarks = "<leader>h Bookmarks"
+nmap <leader>1 <Action>(GotoBookmark1)
+nmap <leader>2 <Action>(GotoBookmark2)
+nmap <leader>3 <Action>(GotoBookmark3)
+nmap <leader>4 <Action>(GotoBookmark4)
+nmap <leader>5 <Action>(GotoBookmark5)
+nmap <leader>6 <Action>(GotoBookmark6)
+nmap <leader>7 <Action>(GotoBookmark7)
+nmap <leader>8 <Action>(GotoBookmark8)
+nmap <leader>9 <Action>(GotoBookmark9)
+let g:WhichKeyDesc_bookmark_1 = "<leader>1 Bookmark 1"
+let g:WhichKeyDesc_bookmark_2 = "<leader>2 Bookmark 2"
+let g:WhichKeyDesc_bookmark_3 = "<leader>3 Bookmark 3"
+let g:WhichKeyDesc_bookmark_4 = "<leader>4 Bookmark 4"
+let g:WhichKeyDesc_bookmark_5 = "<leader>5 Bookmark 5"
+let g:WhichKeyDesc_bookmark_6 = "<leader>6 Bookmark 6"
+let g:WhichKeyDesc_bookmark_7 = "<leader>7 Bookmark 7"
+let g:WhichKeyDesc_bookmark_8 = "<leader>8 Bookmark 8"
+let g:WhichKeyDesc_bookmark_9 = "<leader>9 Bookmark 9"

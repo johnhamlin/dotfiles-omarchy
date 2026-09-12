@@ -1,9 +1,8 @@
-" Required plugins from the JetBrains Marketplace:
-" - IdeaVim
-" - Which-Key
-" - EasyMotion
-" - Vim Dial
-
-source ~/.config/ideavim/lazy-idea/.ideavimrc
-
-source ~/.config/ideavim/johnideavimrc
+" Managed by chezmoi. Upstream stays unmodified; John's overrides always load last.
+" Setup and update instructions: ~/notes/jetbrains-lazyvim/README.md
+if filereadable(expand('~/.lazy-idea/lazy-idea.vim'))
+  source ~/.lazy-idea/lazy-idea.vim
+  source ~/.config/ideavim/johnideavimrc
+else
+  echo 'lazy-idea missing: run lazy-idea-manage bootstrap, then restart the IDE'
+endif

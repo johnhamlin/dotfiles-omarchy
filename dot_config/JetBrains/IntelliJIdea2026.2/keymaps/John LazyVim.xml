@@ -1,0 +1,12 @@
+<keymap version="1" name="John LazyVim" parent="$default">
+  <!-- Accept with Ctrl-Y. Enter remains EditorEnter, not completion acceptance. -->
+  <action id="EditorChooseLookupItem">
+    <keyboard-shortcut first-keystroke="control Y" />
+  </action>
+  <action id="EditorDeleteLine" />
+  <!-- Closest native equivalent of the separate LazyVim snippet picker. -->
+  <action id="InsertLiveTemplate">
+    <keyboard-shortcut first-keystroke="control shift SPACE" />
+  </action>
+  <action id="SmartTypeCompletion" />
+</keymap>
