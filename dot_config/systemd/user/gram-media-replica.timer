@@ -1,0 +1,7 @@
+[Unit]
+Description=Hourly off-host gram media backup replication
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+[Install]
+WantedBy=timers.target

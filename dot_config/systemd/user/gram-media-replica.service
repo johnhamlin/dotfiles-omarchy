@@ -1,0 +1,11 @@
+[Unit]
+Description=Replicate encrypted gram media backups to this desktop
+After=network-online.target
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/bin/python3 %h/.local/lib/gram-media-replica/replicate.py
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
