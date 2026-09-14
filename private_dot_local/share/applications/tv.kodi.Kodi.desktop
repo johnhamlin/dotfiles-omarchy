@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Kodi
+Comment=Movies, TV and Jellyfin
+Exec=/usr/bin/flatpak run tv.kodi.Kodi
+Icon=kodi
+Terminal=false
+Categories=AudioVideo;Video;Player;TV;
+X-Flatpak=tv.kodi.Kodi
