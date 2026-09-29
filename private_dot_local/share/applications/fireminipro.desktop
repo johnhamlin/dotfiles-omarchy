@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=FireMinipro
+Comment=Read and program EEPROMs with the XGecu T48
+Exec=/home/john/.local/share/fireminipro/0.1.0/fireminipro
+Icon=fireminipro
+Terminal=false
+Categories=Development;Electronics;
+Keywords=EEPROM;ROM;T48;AT28C256;minipro;
